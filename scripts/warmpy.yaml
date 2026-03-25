@@ -1,0 +1,28 @@
+pip:
+  - pyobjc-framework-Cocoa
+  - pyobjc-framework-Quartz
+  - mdformat
+  - mdformat-gfm
+  - linkify-it-py
+  - typing_extensions
+
+modules:
+  - objc
+  - Foundation
+  - AppKit
+  - Quartz
+  - ctypes
+  - ctypes.util
+  - mdformat
+  - mdformat._util
+  - mdformat.renderer
+  - mdformat_gfm
+  - mdformat_gfm._gfm
+  - mdformat_gfm._mdformat_plugin
+  - mdformat_gfm._mdit_gfm_autolink_plugin
+  - mdformat_gfm._tables_plugin
+  - mdformat_gfm._text_inline_rule
+  - markdown_it
+  - mdit_py_plugins
+  - mdurl
+  - linkify_it
