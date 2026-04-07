@@ -27,6 +27,12 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_normalizes_right_curly_double_quote_to_ascii(self) -> None:
+        source = 'заметки для вас не “дисциплина успешного человека”, а канал\n'
+        expected = 'Заметки для вас не "дисциплина успешного человека", а канал'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_keeps_fragment_lists_tight_and_preserves_case(self) -> None:
         source = '- speed\n- simplicity\n- markdown support\n'
         expected = '- speed\n- simplicity\n- markdown support'
@@ -80,6 +86,66 @@ class CleanupMarkdownTests(unittest.TestCase):
         expected = 'Тест [[note]] текст'
 
         self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_strips_full_bold_wrapper_from_heading(self) -> None:
+        source = '# **header**\n'
+        expected = '# Header'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_strips_bold_wrapper_from_numbered_heading_body(self) -> None:
+        source = '#### 2. **запись как форма и разрядка**\n'
+        expected = '#### 2. Запись как форма и разрядка'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_preserves_partial_bold_inside_heading(self) -> None:
+        source = '# header with **focus**\n'
+        expected = '# Header with **focus**'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_can_disable_bold_heading_normalization(self) -> None:
+        source = '# **header**\n'
+        expected = '# **Header**'
+
+        self.assertEqual(
+            cleanup_markdown(
+                source,
+                CleanupMarkdownOptions(normalize_bold_headings=False),
+            ),
+            expected,
+        )
+
+    def test_can_disable_obsidian_wikilink_restore(self) -> None:
+        source = '[[note]]\n'
+        expected = '\\[[Note]\\]'
+
+        self.assertEqual(
+            cleanup_markdown(
+                source,
+                CleanupMarkdownOptions(restore_obsidian_wikilinks=False),
+            ),
+            expected,
+        )
+
+    def test_strips_hardbreak_markup_in_ordered_lists(self) -> None:
+        source = '1. «заголовок»  \n   продолжение\n'
+        expected = '1. "заголовок"\n   продолжение'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_can_disable_hardbreak_markup_stripping(self) -> None:
+        source = '1. «заголовок»  \n   продолжение\n'
+        expected = '1. "заголовок"\\\n   продолжение'
+
+        self.assertEqual(
+            cleanup_markdown(
+                source,
+                CleanupMarkdownOptions(strip_hardbreak_markup=False),
+            ),
+            expected,
+        )
 
     def test_capitalizes_after_email_when_sentence_continues_in_next_fragment(self) -> None:
         source = 'Тест почты user@yandex.ru. вот такая у меня крутая почта.'

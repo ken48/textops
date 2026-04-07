@@ -19,6 +19,7 @@ QUOTE_NORMALIZATION = str.maketrans(
         "»": '"',
         "„": '"',
         "“": '"',
+        "”": '"',
         "‟": '"',
         "’": "'",
         "‘": "'",
@@ -47,6 +48,10 @@ TECHNICAL_TOKEN_RE = re.compile(
     re.UNICODE,
 )
 OBSIDIAN_WIKILINK_RE = re.compile(r"\\\[\[(.+?)]\\]")
+FULL_BOLD_HEADING_RE = re.compile(
+    r"^(?P<prefix>#{1,6}[ \t]+(?:\d+[.)]?[ \t]+)?)\*\*(?P<body>.+?)\*\*(?P<suffix>[ \t]*)$",
+    re.MULTILINE,
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,9 @@ class CleanupMarkdownOptions:
     capitalize_sentences: bool = True
     preserve_technical_tokens: bool = True
     preserve_tight_lists: bool = True
+    strip_hardbreak_markup: bool = True
+    normalize_bold_headings: bool = True
+    restore_obsidian_wikilinks: bool = True
 
 
 @dataclass
@@ -250,6 +258,28 @@ def _looks_like_sentence(text: str) -> bool:
 
 def _restore_obsidian_wikilinks(text: str) -> str:
     return OBSIDIAN_WIKILINK_RE.sub(r"[[\1]]", text)
+
+
+def _strip_full_bold_heading_markup(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{match.group('body')}{match.group('suffix')}"
+
+    return FULL_BOLD_HEADING_RE.sub(replace, text)
+
+
+def _normalize_hardbreak_tokens(tokens: Sequence[Any]) -> None:
+    for token in tokens:
+        children = getattr(token, "children", None)
+        if not children:
+            continue
+
+        for child in children:
+            if child.type != "hardbreak":
+                continue
+
+            child.type = "softbreak"
+            child.tag = ""
+            child.markup = ""
 
 
 def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
@@ -449,8 +479,14 @@ def cleanup_markdown(
         if token.type == "inline":
             inline_formatter.apply(token, index)
 
+    if resolved_options.strip_hardbreak_markup:
+        _normalize_hardbreak_tokens(tokens)
+
     rendered = formatter.renderer.render(tokens, formatter.options, {})
     rendered = rendered.removesuffix("\n")
-    rendered = _restore_obsidian_wikilinks(rendered)
+    if resolved_options.restore_obsidian_wikilinks:
+        rendered = _restore_obsidian_wikilinks(rendered)
+    if resolved_options.normalize_bold_headings:
+        rendered = _strip_full_bold_heading_markup(rendered)
 
     return rendered

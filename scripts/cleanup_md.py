@@ -21,6 +21,9 @@ MARKDOWN_CLEANUP_OPTIONS = CleanupMarkdownOptions(
     capitalize_sentences=True,
     preserve_technical_tokens=True,
     preserve_tight_lists=True,
+    strip_hardbreak_markup=True,
+    normalize_bold_headings=True,
+    restore_obsidian_wikilinks=True,
 )
 
 
