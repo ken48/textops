@@ -93,6 +93,12 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_keeps_lowercase_word_after_quoted_question_inside_sentence(self) -> None:
+        source = 'кризис героя: старый ответ на вопрос "кто я?" больше не работает.\n'
+        expected = 'Кризис героя: старый ответ на вопрос "кто я?" больше не работает.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_keeps_coordinated_semicolon_list_tight(self) -> None:
         source = (
             'по сути, здесь нужно прояснить две вещи:\n\n'

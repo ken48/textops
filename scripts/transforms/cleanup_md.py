@@ -130,11 +130,9 @@ def _is_sentence_boundary(text: str, index: int) -> bool:
         return False
 
     if next_char == '"':
-        after_quote_index, after_quote_char = _next_non_space(text, index + 2)
+        _, after_quote_char = _next_non_space(text, index + 2)
         if after_quote_char and after_quote_char.isalpha() and after_quote_char.islower():
-            after_word_index, after_word_char = _next_non_space(text, after_quote_index + 1)
-            if after_word_char == '"':
-                return False
+            return False
 
     return True
 
