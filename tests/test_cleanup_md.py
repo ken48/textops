@@ -203,6 +203,26 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_keeps_topic_list_tight_and_lowercase_even_with_long_item(self) -> None:
+        source = (
+            'Переход от смысловой части к прикладной:\n\n'
+            '- структура папок\n\n'
+            '- daily / notes / обзоры\n\n'
+            '- роль `agents.md`\n\n'
+            '- пример из репозитория\n\n'
+            '- как это может выглядеть в реальной работе без лишней теории\n'
+        )
+        expected = (
+            'Переход от смысловой части к прикладной:\n\n'
+            '- структура папок\n'
+            '- daily / notes / обзоры\n'
+            '- роль `agents.md`\n'
+            '- пример из репозитория\n'
+            '- как это может выглядеть в реальной работе без лишней теории'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_allows_call_site_to_disable_sentence_capitalization(self) -> None:
         source = 'привет. "мир" - это тест\n'
         expected = 'привет. "мир" — это тест'

@@ -325,6 +325,29 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
     return all(text.endswith((",", ";")) for text in texts[:-1]) and texts[-1].endswith((".", "!", "?"))
 
 
+def _looks_like_topic_list(items: list[_AnalyzedListItem]) -> bool:
+    if len(items) < 2:
+        return False
+
+    texts = [item.texts[0].strip() for item in items if item.texts]
+    if len(texts) != len(items):
+        return False
+
+    if any(item.paragraph_count != 1 for item in items):
+        return False
+
+    if any(not text for text in texts):
+        return False
+
+    if any(text[0].isalpha() and text[0].isupper() for text in texts):
+        return False
+
+    if any(text.endswith((".", "!", "?", ",", ";", ":")) for text in texts):
+        return False
+
+    return True
+
+
 def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
     list_looseness: dict[int, bool] = {}
     skip_capitalization: set[int] = set()
@@ -341,11 +364,12 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
             if token.type in {"bullet_list_close", "ordered_list_close"}:
                 list_context = stack.pop()
                 coordinated_list = _looks_like_coordinated_list(list_context.items)
-                is_loose = not coordinated_list and any(
+                topic_list = _looks_like_topic_list(list_context.items)
+                is_loose = not coordinated_list and not topic_list and any(
                     item.sentence_like for item in list_context.items
                 )
 
-                if coordinated_list:
+                if coordinated_list or topic_list:
                     for item in list_context.items:
                         skip_capitalization.update(item.inline_indices)
 
