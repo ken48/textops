@@ -12,6 +12,7 @@ from mdformat.renderer import MDRenderer
 
 WRAP_OPTIONS = {"wrap": "keep"}
 PARSER_EXTENSIONS = ("gfm",)
+THEMATIC_BREAK_MARKUP = "***"
 
 QUOTE_NORMALIZATION = str.maketrans(
     {
@@ -35,6 +36,7 @@ NUM_COLON_RE = re.compile(r"(\d)[ \t]*:[ \t]*(\d)")
 MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
 SENTENCE_END_RE = re.compile(r'[.!?][]["»“”)]*$')
 WORD_RE = re.compile(r"\w+", re.UNICODE)
+COORDINATED_ITEM_SEPARATOR_RE = re.compile(r"\s(?:->|→|=>|:)\s")
 TECHNICAL_TOKEN_RE = re.compile(
     r"(?<!\S)("
     r"(?:https?|ftp)://[^\s<>()]+"
@@ -94,6 +96,20 @@ class _ListContext:
     items: list[_AnalyzedListItem]
 
 
+def _render_thematic_break(_: Any, __: Any) -> str:
+    return THEMATIC_BREAK_MARKUP
+
+
+class _ThematicBreakRendererPlugin:
+    CHANGES_AST = False
+    RENDERERS = {"hr": _render_thematic_break}
+    POSTPROCESSORS: dict[str, Any] = {}
+
+    @staticmethod
+    def update_mdit(_: MarkdownIt) -> None:
+        return None
+
+
 def _build_markdown_it(renderer_cls: type[MDRenderer]) -> MarkdownIt:
     def renderer_factory(parser: MarkdownIt) -> Any:
         return renderer_cls(parser)
@@ -112,6 +128,7 @@ def _build_markdown_it(renderer_cls: type[MDRenderer]) -> MarkdownIt:
         plugin.update_mdit(markdown_it)
 
     markdown_it.options["codeformatters"] = {}
+    markdown_it.options["parser_extension"].append(_ThematicBreakRendererPlugin)
 
     return markdown_it
 
@@ -298,6 +315,9 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
 
     if any(text[0].isalpha() and text[0].isupper() for text in texts):
         return False
+
+    if all(COORDINATED_ITEM_SEPARATOR_RE.search(text) for text in texts):
+        return True
 
     if not any(text.endswith((",", ";")) for text in texts[:-1]):
         return False

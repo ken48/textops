@@ -21,6 +21,12 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_normalizes_thematic_breaks_to_asterisks(self) -> None:
+        source = 'text\n\n---\n\nnext\n'
+        expected = 'Text\n\n***\n\nNext'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_formats_plain_prose_as_markdown_fragment(self) -> None:
         source = 'привет. "мир" - это тест и  еще  текст ,да?'
         expected = 'Привет. "Мир" — это тест и еще текст, да?'
@@ -175,6 +181,24 @@ class CleanupMarkdownTests(unittest.TestCase):
             'По сути, здесь нужно прояснить две вещи:\n\n'
             '- кто держит это на себе;\n'
             '- какой уровень исполнения нас обоих устраивает.'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_arrow_mapping_list_tight_and_lowercase(self) -> None:
+        source = (
+            'их связь выглядит так:\n\n'
+            '- осознание потребности -> стратегия\n\n'
+            '- планирование -> тактика\n\n'
+            '- действие -> операция\n\n'
+            '- оценка результата -> поддержка системы и актуализация стратегии\n'
+        )
+        expected = (
+            'Их связь выглядит так:\n\n'
+            '- осознание потребности -> стратегия\n'
+            '- планирование -> тактика\n'
+            '- действие -> операция\n'
+            '- оценка результата -> поддержка системы и актуализация стратегии'
         )
 
         self.assertEqual(cleanup_markdown(source), expected)
