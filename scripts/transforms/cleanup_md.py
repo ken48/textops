@@ -13,6 +13,7 @@ from mdformat.renderer import MDRenderer
 WRAP_OPTIONS = {"wrap": "keep"}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
+SHORT_LIST_ITEM_MAX_CHARS = 80
 
 QUOTE_NORMALIZATION = str.maketrans(
     {
@@ -35,7 +36,6 @@ DASH_BETWEEN_WORDS_RE = re.compile(r"(?<=\S)\s+-\s+(?=\S)")
 NUM_COLON_RE = re.compile(r"(\d)[ \t]*:[ \t]*(\d)")
 MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
 SENTENCE_END_RE = re.compile(r'[.!?][]["»“”)]*$')
-WORD_RE = re.compile(r"\w+", re.UNICODE)
 COORDINATED_ITEM_SEPARATOR_RE = re.compile(r"\s(?:->|→|=>|:)\s")
 TECHNICAL_TOKEN_RE = re.compile(
     r"(?<!\S)("
@@ -267,10 +267,15 @@ def _looks_like_sentence(text: str) -> bool:
     if not stripped:
         return False
 
-    if SENTENCE_END_RE.search(stripped):
-        return True
+    return bool(SENTENCE_END_RE.search(stripped))
 
-    return len(WORD_RE.findall(stripped)) >= 7
+
+def _is_short_list_sentence(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+
+    return len(stripped) <= SHORT_LIST_ITEM_MAX_CHARS
 
 
 def _restore_obsidian_wikilinks(text: str) -> str:
@@ -313,9 +318,6 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
     if any(not text for text in texts):
         return False
 
-    if any(text[0].isalpha() and text[0].isupper() for text in texts):
-        return False
-
     if all(COORDINATED_ITEM_SEPARATOR_RE.search(text) for text in texts):
         return True
 
@@ -323,29 +325,6 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
         return False
 
     return all(text.endswith((",", ";")) for text in texts[:-1]) and texts[-1].endswith((".", "!", "?"))
-
-
-def _looks_like_topic_list(items: list[_AnalyzedListItem]) -> bool:
-    if len(items) < 2:
-        return False
-
-    texts = [item.texts[0].strip() for item in items if item.texts]
-    if len(texts) != len(items):
-        return False
-
-    if any(item.paragraph_count != 1 for item in items):
-        return False
-
-    if any(not text for text in texts):
-        return False
-
-    if any(text[0].isalpha() and text[0].isupper() for text in texts):
-        return False
-
-    if any(text.endswith((".", "!", "?", ",", ";", ":")) for text in texts):
-        return False
-
-    return True
 
 
 def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
@@ -364,12 +343,11 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
             if token.type in {"bullet_list_close", "ordered_list_close"}:
                 list_context = stack.pop()
                 coordinated_list = _looks_like_coordinated_list(list_context.items)
-                topic_list = _looks_like_topic_list(list_context.items)
-                is_loose = not coordinated_list and not topic_list and any(
+                is_loose = not coordinated_list and any(
                     item.sentence_like for item in list_context.items
                 )
 
-                if coordinated_list or topic_list:
+                if coordinated_list:
                     for item in list_context.items:
                         skip_capitalization.update(item.inline_indices)
 
@@ -380,8 +358,16 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
 
             if token.type == "list_item_close":
                 collected_item = open_items.pop()
-                sentence_like = collected_item.paragraph_count > 1 or any(
+                has_sentence_ending = any(
                     _looks_like_sentence(text) for text in collected_item.texts
+                )
+                short_sentence_item = (
+                    collected_item.paragraph_count == 1
+                    and has_sentence_ending
+                    and all(_is_short_list_sentence(text) for text in collected_item.texts)
+                )
+                sentence_like = collected_item.paragraph_count > 1 or (
+                    has_sentence_ending and not short_sentence_item
                 )
 
                 if not sentence_like:

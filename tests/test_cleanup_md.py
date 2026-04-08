@@ -45,15 +45,33 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
-    def test_makes_sentence_lists_loose_and_capitalizes_items(self) -> None:
+    def test_keeps_short_sentence_lists_tight(self) -> None:
         source = '- this is a sentence.\n- this is another sentence.\n'
-        expected = '- This is a sentence.\n\n- This is another sentence.'
+        expected = '- this is a sentence.\n- this is another sentence.'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_loose_style_propagates_to_mixed_list(self) -> None:
         source = '- speed\n- this is a longer sentence item that should look like prose.\n'
-        expected = '- speed\n\n- This is a longer sentence item that should look like prose.'
+        expected = '- speed\n- this is a longer sentence item that should look like prose.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_short_sentence_list_items_tight(self) -> None:
+        source = '- markdown как формат.\n- github для синхронизации между устройствами.\n- obsidian как редактор.\n'
+        expected = '- markdown как формат.\n- github для синхронизации между устройствами.\n- obsidian как редактор.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_long_sentence_item_with_period_still_makes_list_loose(self) -> None:
+        source = (
+            '- короткий пункт.\n'
+            '- это уже достаточно длинный пункт списка, чтобы считать его отдельным абзацем, а не компактным элементом.\n'
+        )
+        expected = (
+            '- короткий пункт.\n\n'
+            '- Это уже достаточно длинный пункт списка, чтобы считать его отдельным абзацем, а не компактным элементом.'
+        )
 
         self.assertEqual(cleanup_markdown(source), expected)
 
