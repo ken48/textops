@@ -370,7 +370,7 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
                     has_sentence_ending and not short_sentence_item
                 )
 
-                if not sentence_like:
+                if not has_sentence_ending:
                     skip_capitalization.update(collected_item.inline_indices)
 
                 analyzed_item = _AnalyzedListItem(
