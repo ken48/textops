@@ -11,7 +11,7 @@ from transforms.cleanup_md import CleanupMarkdownOptions, cleanup_markdown
 class CleanupMarkdownTests(unittest.TestCase):
     def test_formats_markdown_prose_without_breaking_structure(self) -> None:
         source = '# heading\n\n- first item\n  - nested item\n\n> "quote" - here\n'
-        expected = '# Heading\n\n- first item\n  - nested item\n\n> "Quote" — here'
+        expected = '# Heading\n\n- first item\n\n  - nested item\n\n> "Quote" — here'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
@@ -72,6 +72,18 @@ class CleanupMarkdownTests(unittest.TestCase):
             '- Короткий пункт.\n\n'
             '- Это уже достаточно длинный пункт списка, чтобы считать его отдельным абзацем, а не компактным элементом.'
         )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_separates_nested_lists_with_blank_line_like_other_block_items(self) -> None:
+        source = '- из старой статьи взять:\n  - тезис один\n  - тезис два\n'
+        expected = '- из старой статьи взять:\n\n  - тезис один\n  - тезис два'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_nested_list_does_not_loosen_other_short_outer_items(self) -> None:
+        source = '- короткий\n- вводный\n  - вложенный\n- еще короткий\n'
+        expected = '- короткий\n- вводный\n\n  - вложенный\n- еще короткий'
 
         self.assertEqual(cleanup_markdown(source), expected)
 

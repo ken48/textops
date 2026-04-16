@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Any
 
 import mdformat.plugins
 from markdown_it import MarkdownIt
-from mdformat.renderer import MDRenderer
+from mdformat.renderer import DEFAULT_RENDERERS, MDRenderer, RenderContext, RenderTreeNode
+from mdformat.renderer._util import is_tight_list_item
 
 WRAP_OPTIONS = {"wrap": "keep"}
 PARSER_EXTENSIONS = ("gfm",)
@@ -108,6 +110,68 @@ class _ThematicBreakRendererPlugin:
     @staticmethod
     def update_mdit(_: MarkdownIt) -> None:
         return None
+
+
+def _render_list_item(node: Any, context: Any) -> str:
+    default_separator = "\n" if is_tight_list_item(node) else "\n\n"
+    parts: list[str] = []
+
+    for child in node.children:
+        rendered_child = child.render(context)
+        if not rendered_child:
+            continue
+
+        if parts:
+            separator = (
+                "\n\n"
+                if child.type in {"bullet_list", "ordered_list"}
+                else default_separator
+            )
+            parts.append(separator)
+
+        parts.append(rendered_child)
+
+    text = "".join(parts)
+    if not text.strip():
+        return ""
+    return text
+
+
+class _CleanupMDRenderer(MDRenderer):
+    def render_tree(
+        self,
+        tree: RenderTreeNode,
+        options: Mapping[str, Any],
+        env: MutableMapping,
+        *,
+        finalize: bool = True,
+    ) -> str:
+        self._prepare_env(env)
+
+        updated_renderers = {"list_item": _render_list_item}
+        postprocessors: dict[str, tuple[Any, ...]] = {}
+        for plugin in options.get("parser_extension", []):
+            for syntax_name, renderer_func in plugin.RENDERERS.items():
+                updated_renderers.setdefault(syntax_name, renderer_func)
+            for syntax_name, pp in getattr(plugin, "POSTPROCESSORS", {}).items():
+                if syntax_name not in postprocessors:
+                    postprocessors[syntax_name] = (pp,)
+                else:
+                    postprocessors[syntax_name] += (pp,)
+
+        renderer_map = MappingProxyType({**DEFAULT_RENDERERS, **updated_renderers})
+        postprocessor_map = MappingProxyType(postprocessors)
+        render_context = RenderContext(renderer_map, postprocessor_map, options, env)
+        text = tree.render(render_context)
+        if finalize:
+            if env["used_refs"]:
+                text += "\n\n"
+                text += self._write_references(env)
+            if text:
+                text += "\n"
+
+        assert "\x00" not in text, "null bytes should be removed by now"
+        return text
 
 
 def _build_markdown_it(renderer_cls: type[MDRenderer]) -> MarkdownIt:
@@ -366,15 +430,13 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
                     and has_sentence_ending
                     and all(_is_short_list_sentence(text) for text in collected_item.texts)
                 )
-                sentence_like = collected_item.paragraph_count > 1 or (
-                    has_sentence_ending and not short_sentence_item
-                )
-
                 if not has_sentence_ending:
                     skip_capitalization.update(collected_item.inline_indices)
 
                 analyzed_item = _AnalyzedListItem(
-                    sentence_like=sentence_like,
+                    sentence_like=collected_item.paragraph_count > 1 or (
+                        has_sentence_ending and not short_sentence_item
+                    ),
                     inline_indices=collected_item.inline_indices,
                     texts=collected_item.texts,
                     paragraph_count=collected_item.paragraph_count,
@@ -480,7 +542,7 @@ class _InlineTextFormatter:
 
 @lru_cache(maxsize=1)
 def _build_markdown_formatter() -> MarkdownIt:
-    return _build_markdown_it(MDRenderer)
+    return _build_markdown_it(_CleanupMDRenderer)
 
 
 def cleanup_markdown(
