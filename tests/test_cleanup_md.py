@@ -171,6 +171,18 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_preserves_sequential_numbering_in_ordered_lists(self) -> None:
+        source = '1. первый пункт\n2. второй пункт\n'
+        expected = '1. первый пункт\n2. второй пункт'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_preserves_non_default_ordered_list_start(self) -> None:
+        source = '2. второй пункт\n3. третий пункт\n'
+        expected = '2. второй пункт\n3. третий пункт'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_can_disable_hardbreak_markup_stripping(self) -> None:
         source = '1. «заголовок»  \n   продолжение\n'
         expected = '1. "заголовок"\\\n   продолжение'

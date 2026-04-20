@@ -12,7 +12,7 @@ from markdown_it import MarkdownIt
 from mdformat.renderer import DEFAULT_RENDERERS, MDRenderer, RenderContext, RenderTreeNode
 from mdformat.renderer._util import is_tight_list_item
 
-WRAP_OPTIONS = {"wrap": "keep"}
+WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
 SHORT_LIST_ITEM_MAX_CHARS = 80
