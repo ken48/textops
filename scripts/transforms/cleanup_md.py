@@ -10,7 +10,7 @@ from typing import Any
 import mdformat.plugins
 from markdown_it import MarkdownIt
 from mdformat.renderer import DEFAULT_RENDERERS, MDRenderer, RenderContext, RenderTreeNode
-from mdformat.renderer._util import is_tight_list_item
+from mdformat.renderer._util import get_list_marker_type, is_tight_list, is_tight_list_item
 
 WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
@@ -137,6 +137,113 @@ def _render_list_item(node: Any, context: Any) -> str:
     return text
 
 
+def _list_item_ends_with_nested_list(node: RenderTreeNode) -> bool:
+    for child in reversed(node.children):
+        if child.type in {"bullet_list", "ordered_list"}:
+            return True
+        if child.type not in {"softbreak", "hardbreak"}:
+            return False
+    return False
+
+
+def _list_block_separator(is_tight: bool, item: RenderTreeNode) -> str:
+    if not is_tight or _list_item_ends_with_nested_list(item):
+        return "\n\n"
+    return "\n"
+
+
+def _format_list_item_lines(
+    list_item_text: str,
+    first_line_prefix: str,
+    continuation_prefix: str,
+) -> str:
+    formatted_lines = []
+    line_iterator = iter(list_item_text.split("\n"))
+    first_line = next(line_iterator)
+    formatted_lines.append(
+        f"{first_line_prefix}{first_line}" if first_line else first_line_prefix.rstrip()
+    )
+    for line in line_iterator:
+        formatted_lines.append(f"{continuation_prefix}{line}" if line else "")
+    return "\n".join(formatted_lines)
+
+
+def _render_list(
+    node: RenderTreeNode,
+    context: RenderContext,
+    indent_width: int,
+    item_prefixes: Sequence[str],
+) -> str:
+    continuation_prefix = " " * indent_width
+    is_tight = is_tight_list(node)
+    assert len(item_prefixes) == len(node.children)
+
+    with context.indented(indent_width):
+        parts: list[str] = []
+        for item_prefix, child in zip(item_prefixes, node.children):
+            list_item_text = child.render(context)
+            parts.append(
+                _format_list_item_lines(
+                    list_item_text, item_prefix, continuation_prefix
+                )
+            )
+            parts.append(_list_block_separator(is_tight, child))
+
+    if parts:
+        parts.pop()
+    return "".join(parts)
+
+
+def _render_bullet_list(node: RenderTreeNode, context: RenderContext) -> str:
+    marker_type = get_list_marker_type(node)
+    first_line_indent = " "
+    prefix = f"{marker_type}{first_line_indent}"
+    indent_width = len(prefix)
+    item_prefixes = [prefix] * len(node.children)
+
+    return _render_list(node, context, indent_width, item_prefixes)
+
+
+def _render_ordered_list(node: RenderTreeNode, context: RenderContext) -> str:
+    consecutive_numbering = context.options.get("mdformat", {}).get(
+        "number", True
+    )
+    marker_type = get_list_marker_type(node)
+    first_line_indent = " "
+    list_len = len(node.children)
+
+    starting_number = node.attrs.get("start")
+    if starting_number is None:
+        starting_number = 1
+    assert isinstance(starting_number, int)
+
+    if consecutive_numbering:
+        max_number = list_len + starting_number - 1
+        indent_width = len(
+            f"{max_number}{marker_type}{first_line_indent}"
+        )
+        max_width = len(str(max_number))
+        item_prefixes = [
+            f"{str(starting_number + index).rjust(max_width, '0')}"
+            f"{marker_type}{first_line_indent}"
+            for index in range(list_len)
+        ]
+    else:
+        indent_width = len(f"{starting_number}{marker_type}{first_line_indent}")
+        first_item_marker = f"{starting_number}{marker_type}"
+        other_item_marker = "0" * (len(str(starting_number)) - 1) + "1" + marker_type
+        item_prefixes = [
+            (
+                f"{first_item_marker}{first_line_indent}"
+                if index == 0
+                else f"{other_item_marker}{first_line_indent}"
+            )
+            for index in range(list_len)
+        ]
+
+    return _render_list(node, context, indent_width, item_prefixes)
+
+
 class _CleanupMDRenderer(MDRenderer):
     def render_tree(
         self,
@@ -148,7 +255,11 @@ class _CleanupMDRenderer(MDRenderer):
     ) -> str:
         self._prepare_env(env)
 
-        updated_renderers = {"list_item": _render_list_item}
+        updated_renderers = {
+            "bullet_list": _render_bullet_list,
+            "ordered_list": _render_ordered_list,
+            "list_item": _render_list_item,
+        }
         postprocessors: dict[str, tuple[Any, ...]] = {}
         for plugin in options.get("parser_extension", []):
             for syntax_name, renderer_func in plugin.RENDERERS.items():
@@ -334,6 +445,16 @@ def _looks_like_sentence(text: str) -> bool:
     return bool(SENTENCE_END_RE.search(stripped))
 
 
+def _count_sentence_boundaries(text: str) -> int:
+    stripped = text.strip()
+    if not stripped:
+        return 0
+
+    return sum(
+        1 for index in range(len(stripped)) if _is_sentence_boundary(stripped, index)
+    )
+
+
 def _is_short_list_sentence(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
@@ -422,20 +543,25 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
 
             if token.type == "list_item_close":
                 collected_item = open_items.pop()
-                has_sentence_ending = any(
+                sentence_boundary_count = sum(
+                    _count_sentence_boundaries(text) for text in collected_item.texts
+                )
+                has_sentence_boundary = sentence_boundary_count > 0
+                ends_with_sentence = any(
                     _looks_like_sentence(text) for text in collected_item.texts
                 )
                 short_sentence_item = (
                     collected_item.paragraph_count == 1
-                    and has_sentence_ending
+                    and sentence_boundary_count == 1
+                    and ends_with_sentence
                     and all(_is_short_list_sentence(text) for text in collected_item.texts)
                 )
-                if not has_sentence_ending:
+                if not has_sentence_boundary:
                     skip_capitalization.update(collected_item.inline_indices)
 
                 analyzed_item = _AnalyzedListItem(
                     sentence_like=collected_item.paragraph_count > 1 or (
-                        has_sentence_ending and not short_sentence_item
+                        has_sentence_boundary and not short_sentence_item
                     ),
                     inline_indices=collected_item.inline_indices,
                     texts=collected_item.texts,

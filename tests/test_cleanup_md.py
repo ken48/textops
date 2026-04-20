@@ -75,6 +75,18 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_multi_sentence_list_item_without_final_period_is_still_sentence_like(self) -> None:
+        source = (
+            '- короткий пункт\n'
+            '- первое предложение. второе предложение без точки\n'
+        )
+        expected = (
+            '- короткий пункт\n\n'
+            '- Первое предложение. Второе предложение без точки'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_separates_nested_lists_with_blank_line_like_other_block_items(self) -> None:
         source = '- из старой статьи взять:\n  - тезис один\n  - тезис два\n'
         expected = '- из старой статьи взять:\n\n  - тезис один\n  - тезис два'
@@ -83,7 +95,29 @@ class CleanupMarkdownTests(unittest.TestCase):
 
     def test_nested_list_does_not_loosen_other_short_outer_items(self) -> None:
         source = '- короткий\n- вводный\n  - вложенный\n- еще короткий\n'
-        expected = '- короткий\n- вводный\n\n  - вложенный\n- еще короткий'
+        expected = '- короткий\n- вводный\n\n  - вложенный\n\n- еще короткий'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_adds_blank_line_after_nested_sublist_before_next_outer_item(self) -> None:
+        source = (
+            '3. Эффективность. Меньше ресурсов — больше результата.\n\n'
+            '   - Личная система эффективности\n'
+            '     - ценность времени и расписание\n'
+            '     - учет дел и личных проектов\n\n'
+            '   - Важность инструментария\n'
+            '     - личного\n'
+            '     - бытового\n'
+        )
+        expected = (
+            '3. Эффективность. Меньше ресурсов — больше результата.\n\n'
+            '   - Личная система эффективности\n\n'
+            '     - ценность времени и расписание\n'
+            '     - учет дел и личных проектов\n\n'
+            '   - Важность инструментария\n\n'
+            '     - личного\n'
+            '     - бытового'
+        )
 
         self.assertEqual(cleanup_markdown(source), expected)
 
