@@ -75,13 +75,13 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
-    def test_multi_sentence_list_item_without_final_period_is_still_sentence_like(self) -> None:
+    def test_short_multi_sentence_list_item_stays_tight(self) -> None:
         source = (
             '- короткий пункт\n'
             '- первое предложение. второе предложение без точки\n'
         )
         expected = (
-            '- короткий пункт\n\n'
+            '- короткий пункт\n'
             '- Первое предложение. Второе предложение без точки'
         )
 
@@ -313,6 +313,20 @@ class CleanupMarkdownTests(unittest.TestCase):
             '- роль `agents.md`\n'
             '- пример из репозитория\n'
             '- как это может выглядеть в реальной работе без лишней теории'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_short_filename_pattern_list_tight(self) -> None:
+        source = (
+            'Имя файла — единственная классификация:\n\n'
+            '- Есть тема — `YYYY-MM-DD Some topic.*`\n\n'
+            '- Нет темы — `YYYY-MM-DD HH-mm-ss.*`.\n'
+        )
+        expected = (
+            'Имя файла — единственная классификация:\n\n'
+            '- Есть тема — `YYYY-MM-DD Some topic.*`\n'
+            '- Нет темы — `YYYY-MM-DD HH-mm-ss.*`.'
         )
 
         self.assertEqual(cleanup_markdown(source), expected)

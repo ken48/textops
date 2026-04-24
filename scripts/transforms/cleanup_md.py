@@ -16,7 +16,6 @@ WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
 SHORT_LIST_ITEM_MAX_CHARS = 80
-TIGHT_COORDINATED_LIST_ITEM_MAX_CHARS = SHORT_LIST_ITEM_MAX_CHARS
 
 QUOTE_NORMALIZATION = str.maketrans(
     {
@@ -87,7 +86,7 @@ class _CollectedListItem:
 
 @dataclass
 class _AnalyzedListItem:
-    sentence_like: bool
+    long_enough_to_loosen: bool
     inline_indices: list[int]
     texts: list[str]
     paragraph_count: int
@@ -521,17 +520,6 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
     return all(text.endswith((",", ";")) for text in texts[:-1]) and texts[-1].endswith((".", "!", "?"))
 
 
-def _looks_like_tight_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
-    texts = _coordinated_list_texts(items)
-    if texts is None:
-        return False
-
-    if any(len(text) > TIGHT_COORDINATED_LIST_ITEM_MAX_CHARS for text in texts):
-        return False
-
-    return _looks_like_coordinated_list(items)
-
-
 def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
     list_looseness: dict[int, bool] = {}
     skip_capitalization: set[int] = set()
@@ -548,11 +536,8 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
             if token.type in {"bullet_list_close", "ordered_list_close"}:
                 list_context = stack.pop()
                 coordinated_list = _looks_like_coordinated_list(list_context.items)
-                tight_coordinated_list = _looks_like_tight_coordinated_list(
-                    list_context.items
-                )
-                is_loose = not tight_coordinated_list and any(
-                    item.sentence_like for item in list_context.items
+                is_loose = any(
+                    item.long_enough_to_loosen for item in list_context.items
                 )
 
                 if coordinated_list:
@@ -583,8 +568,10 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
                     skip_capitalization.update(collected_item.inline_indices)
 
                 analyzed_item = _AnalyzedListItem(
-                    sentence_like=collected_item.paragraph_count > 1 or (
-                        has_sentence_boundary and not short_sentence_item
+                    long_enough_to_loosen=collected_item.paragraph_count > 1
+                    or any(
+                        len(text.strip()) > SHORT_LIST_ITEM_MAX_CHARS
+                        for text in collected_item.texts
                     ),
                     inline_indices=collected_item.inline_indices,
                     texts=collected_item.texts,
