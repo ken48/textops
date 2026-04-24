@@ -16,6 +16,7 @@ WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
 SHORT_LIST_ITEM_MAX_CHARS = 80
+TIGHT_COORDINATED_LIST_ITEM_MAX_CHARS = SHORT_LIST_ITEM_MAX_CHARS
 
 QUOTE_NORMALIZATION = str.maketrans(
     {
@@ -489,18 +490,26 @@ def _normalize_hardbreak_tokens(tokens: Sequence[Any]) -> None:
             child.markup = ""
 
 
-def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
+def _coordinated_list_texts(items: list[_AnalyzedListItem]) -> list[str] | None:
     if len(items) < 2:
-        return False
+        return None
 
     texts = [item.texts[0].strip() for item in items if item.texts]
     if len(texts) != len(items):
-        return False
+        return None
 
     if any(item.paragraph_count != 1 for item in items):
-        return False
+        return None
 
     if any(not text for text in texts):
+        return None
+
+    return texts
+
+
+def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
+    texts = _coordinated_list_texts(items)
+    if texts is None:
         return False
 
     if all(COORDINATED_ITEM_SEPARATOR_RE.search(text) for text in texts):
@@ -510,6 +519,17 @@ def _looks_like_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
         return False
 
     return all(text.endswith((",", ";")) for text in texts[:-1]) and texts[-1].endswith((".", "!", "?"))
+
+
+def _looks_like_tight_coordinated_list(items: list[_AnalyzedListItem]) -> bool:
+    texts = _coordinated_list_texts(items)
+    if texts is None:
+        return False
+
+    if any(len(text) > TIGHT_COORDINATED_LIST_ITEM_MAX_CHARS for text in texts):
+        return False
+
+    return _looks_like_coordinated_list(items)
 
 
 def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
@@ -528,7 +548,10 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
             if token.type in {"bullet_list_close", "ordered_list_close"}:
                 list_context = stack.pop()
                 coordinated_list = _looks_like_coordinated_list(list_context.items)
-                is_loose = not coordinated_list and any(
+                tight_coordinated_list = _looks_like_tight_coordinated_list(
+                    list_context.items
+                )
+                is_loose = not tight_coordinated_list and any(
                     item.sentence_like for item in list_context.items
                 )
 
@@ -625,8 +648,8 @@ class _InlineTextFormatter:
         return bool(self._link_stack)
 
     def apply(self, inline_token: Any, token_index: int) -> None:
-        self._sentence_start = True
-        capitalize = token_index not in self._skip_capitalization
+        self._sentence_start = token_index not in self._skip_capitalization
+        capitalize = True
 
         if not inline_token.children:
             return

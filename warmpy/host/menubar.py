@@ -16,6 +16,7 @@ from Cocoa import (
 )
 
 from .paths import LOG_FILE, resource_path
+from .relaunch import relaunch_command, schedule_relaunch
 
 _HANDLER: Handler | None = None
 
@@ -77,6 +78,13 @@ class Handler(NSObject):
         open_log.setTarget_(self)
         self.menu.addItem_(open_log)
 
+        restart_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Restart", "restart:", ""
+        )
+        restart_item.setTarget_(self)
+        restart_item.setEnabled_(relaunch_command() is not None)
+        self.menu.addItem_(restart_item)
+
         self.menu.addItem_(NSMenuItem.separatorItem())
 
         quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
@@ -99,6 +107,17 @@ class Handler(NSObject):
             NSWorkspace.sharedWorkspace().openFile_(str(LOG_FILE))
         except Exception:
             logging.exception("Open log failed")
+
+    def restart_(self, _sender: Any) -> None:
+        try:
+            if not schedule_relaunch():
+                logging.error("Restart requested but no relaunch target is available")
+                return
+        except Exception:
+            logging.exception("Restart scheduling failed")
+            return
+
+        NSApplication.sharedApplication().terminate_(None)
 
     def quit_(self, _sender: Any) -> None:
         NSApplication.sharedApplication().terminate_(None)

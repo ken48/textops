@@ -58,8 +58,8 @@ class CleanupMarkdownTests(unittest.TestCase):
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_keeps_short_sentence_list_items_tight(self) -> None:
-        source = '- markdown как формат.\n- github для синхронизации между устройствами.\n- obsidian как редактор.\n'
-        expected = '- Markdown как формат.\n- Github для синхронизации между устройствами.\n- Obsidian как редактор.'
+        source = '- markdown как разметка.\n- git как инструмент синхронизации.\n- editor как рабочая среда.\n'
+        expected = '- Markdown как разметка.\n- Git как инструмент синхронизации.\n- Editor как рабочая среда.'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
@@ -122,8 +122,8 @@ class CleanupMarkdownTests(unittest.TestCase):
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_keeps_hidden_path_segments_lowercase(self) -> None:
-        source = '/Users/kirill/Projects/vcs/textops/warmpy/.build\n'
-        expected = '/Users/kirill/Projects/vcs/textops/warmpy/.build'
+        source = '/Users/demo/Projects/sample/textops/warmpy/.build\n'
+        expected = '/Users/demo/Projects/sample/textops/warmpy/.build'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
@@ -164,8 +164,8 @@ class CleanupMarkdownTests(unittest.TestCase):
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_strips_bold_wrapper_from_numbered_heading_body(self) -> None:
-        source = '#### 2. **запись как форма и разрядка**\n'
-        expected = '#### 2. Запись как форма и разрядка'
+        source = '#### 2. **заметка как рабочий формат**\n'
+        expected = '#### 2. Заметка как рабочий формат'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
@@ -230,20 +230,20 @@ class CleanupMarkdownTests(unittest.TestCase):
         )
 
     def test_capitalizes_after_email_when_sentence_continues_in_next_fragment(self) -> None:
-        source = 'Тест почты user@yandex.ru. вот такая у меня крутая почта.'
-        expected = 'Тест почты user@yandex.ru. Вот такая у меня крутая почта.'
+        source = 'Тест почты person@example.com. вот так продолжается предложение.'
+        expected = 'Тест почты person@example.com. Вот так продолжается предложение.'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_keeps_lowercase_conjunction_between_quoted_questions(self) -> None:
-        source = 'определить зоны ответственности, чтобы убрать неявные ожидания вроде «почему ты не сделал?» и «почему опять я?».\n'
-        expected = 'Определить зоны ответственности, чтобы убрать неявные ожидания вроде "почему ты не сделал?" и "почему опять я?".'
+        source = 'описать правила процесса, чтобы убрать лишние вопросы вроде «где лежит файл?» и «кто обновляет статус?».\n'
+        expected = 'Описать правила процесса, чтобы убрать лишние вопросы вроде "где лежит файл?" и "кто обновляет статус?".'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
     def test_keeps_lowercase_word_after_quoted_question_inside_sentence(self) -> None:
-        source = 'кризис героя: старый ответ на вопрос "кто я?" больше не работает.\n'
-        expected = 'Кризис героя: старый ответ на вопрос "кто я?" больше не работает.'
+        source = 'описание задачи: старый ответ на вопрос "что дальше?" больше не подходит.\n'
+        expected = 'Описание задачи: старый ответ на вопрос "что дальше?" больше не подходит.'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
@@ -251,12 +251,30 @@ class CleanupMarkdownTests(unittest.TestCase):
         source = (
             'по сути, здесь нужно прояснить две вещи:\n\n'
             '- кто держит это на себе;\n'
-            '- какой уровень исполнения нас обоих устраивает.\n'
+            '- какой уровень исполнения нас устраивает.\n'
         )
         expected = (
             'По сути, здесь нужно прояснить две вещи:\n\n'
             '- кто держит это на себе;\n'
-            '- какой уровень исполнения нас обоих устраивает.'
+            '- какой уровень исполнения нас устраивает.'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_long_coordinated_list_items_become_loose(self) -> None:
+        source = (
+            'Ключевые направления:\n\n'
+            '- архитектура демонстрационного модуля: базовые сущности, связи между компонентами, общие правила именования и схема передачи данных между слоями,\n'
+            '- структура тестового набора: синтетические документы, нейтральные сценарии проверки, шаблоны для регрессий и отдельные случаи для нестандартной пунктуации,\n'
+            '- формализация правил форматирования: сначала определить общие эвристики для коротких списков. затем описать ограничения для длинных пунктов и способ переключения между tight и loose режимами,\n'
+            '- шаблон итогового отчета: краткое описание изменений, список проверок и нейтральные примеры, которые можно безопасно хранить в репозитории.\n'
+        )
+        expected = (
+            'Ключевые направления:\n\n'
+            '- архитектура демонстрационного модуля: базовые сущности, связи между компонентами, общие правила именования и схема передачи данных между слоями,\n\n'
+            '- структура тестового набора: синтетические документы, нейтральные сценарии проверки, шаблоны для регрессий и отдельные случаи для нестандартной пунктуации,\n\n'
+            '- формализация правил форматирования: сначала определить общие эвристики для коротких списков. Затем описать ограничения для длинных пунктов и способ переключения между tight и loose режимами,\n\n'
+            '- шаблон итогового отчета: краткое описание изменений, список проверок и нейтральные примеры, которые можно безопасно хранить в репозитории.'
         )
 
         self.assertEqual(cleanup_markdown(source), expected)
