@@ -318,6 +318,15 @@ def _next_non_space(text: str, start: int) -> tuple[int, str]:
     return -1, ""
 
 
+def _previous_sentence_char(text: str, start: int) -> str:
+    for index in range(start, -1, -1):
+        char = text[index]
+        if char in "\"')]}" or char.isspace():
+            continue
+        return char
+    return ""
+
+
 def _is_sentence_boundary(text: str, index: int) -> bool:
     char = text[index]
     if char not in ".!?":
@@ -326,7 +335,10 @@ def _is_sentence_boundary(text: str, index: int) -> bool:
     prev_char = text[index - 1] if index > 0 else ""
     next_char = text[index + 1] if index + 1 < len(text) else ""
 
-    if char == "." and (not _is_word_char(prev_char) or _is_word_char(next_char)):
+    if char == "." and (
+        not _is_word_char(_previous_sentence_char(text, index - 1))
+        or _is_word_char(next_char)
+    ):
         return False
 
     if next_char == '"':

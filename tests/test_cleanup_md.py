@@ -247,6 +247,34 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_capitalizes_after_period_following_closing_parenthesis(self) -> None:
+        source = (
+            'Статьи какие-то, курсы лекций (большие и маленькие). всего больше 1000 записей!!!'
+        )
+        expected = (
+            'Статьи какие-то, курсы лекций (большие и маленькие). Всего больше 1000 записей!!!'
+        )
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_capitalizes_after_period_following_closing_quote(self) -> None:
+        source = 'Он сказал "это важно". потом продолжил.'
+        expected = 'Он сказал "это важно". Потом продолжил.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_capitalizes_after_period_following_nested_quote_and_parenthesis(self) -> None:
+        source = 'Он сказал ("это важно"). потом продолжил.'
+        expected = 'Он сказал ("это важно"). Потом продолжил.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_capitalizes_after_period_following_closing_bracket(self) -> None:
+        source = 'Вот список [черновик]. потом обновим.'
+        expected = 'Вот список [черновик]. Потом обновим.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
     def test_keeps_coordinated_semicolon_list_tight(self) -> None:
         source = (
             'по сути, здесь нужно прояснить две вещи:\n\n'
