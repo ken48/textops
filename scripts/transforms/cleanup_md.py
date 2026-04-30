@@ -15,7 +15,7 @@ from mdformat.renderer._util import get_list_marker_type, is_tight_list, is_tigh
 WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
-SHORT_LIST_ITEM_MAX_CHARS = 80
+SHORT_LIST_ITEM_MAX_CHARS = 72
 
 QUOTE_NORMALIZATION = str.maketrans(
     {
