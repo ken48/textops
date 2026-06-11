@@ -19,13 +19,14 @@ class _LogStream:
         self._buffer = ""
 
     def write(self, data: object) -> int:
-        if not data:
+        text = str(data) if data else ""
+        if not text:
             return 0
-        self._buffer += str(data)
+        self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
             self._log(line)
-        return len(data)
+        return len(text)
 
     def flush(self) -> None:
         if self._buffer:

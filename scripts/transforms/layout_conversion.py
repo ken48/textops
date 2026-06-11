@@ -1,6 +1,8 @@
 import re
 from enum import IntEnum
 
+LAST_WORD_RE = re.compile(r'(\S+)\s*\Z')
+
 
 class LayoutConversionDirection(IntEnum):
     A = -1
@@ -32,16 +34,22 @@ def replace_last_layout_mismatched_sequence(
     max_chars: int,
     test_chars: int,
 ) -> tuple[str, LayoutConversionDirection]:
+    """Convert the last whitespace-delimited word of ``text`` to the opposite layout.
+
+    The word is always matched in full: words longer than ``max_chars`` are left
+    untouched rather than partially converted.
+    """
     if not text or text.isspace():
         return text, LayoutConversionDirection.UNDEFINED
 
-    last_part = text[-max_chars:] if len(text) > max_chars else text
-    matches = list(re.finditer(r'\S+', last_part))
-    if not matches:
+    match = LAST_WORD_RE.search(text)
+    if match is None:
         return text, LayoutConversionDirection.UNDEFINED
 
-    start, end = matches[-1].span()
-    word = last_part[start:end]
+    word = match.group(1)
+    if len(word) > max_chars:
+        return text, LayoutConversionDirection.UNDEFINED
+
     converted_word, direction = _convert_text_and_detect_direction(
         word,
         word[-test_chars:],
@@ -51,6 +59,4 @@ def replace_last_layout_mismatched_sequence(
     if converted_word == word:
         return text, direction
 
-    new_last_part = last_part[:start] + converted_word + last_part[end:]
-    prefix = text[:-len(last_part)] if len(last_part) < len(text) else ''
-    return prefix + new_last_part, direction
+    return text[:match.start(1)] + converted_word + text[match.end(1):], direction

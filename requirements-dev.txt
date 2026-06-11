@@ -1,0 +1,5 @@
+# Dependencies for running the test suite (scripts/transforms).
+# Runtime/build dependencies for WarmPy live in scripts/warmpy.yaml.
+mdformat
+mdformat-gfm
+linkify-it-py

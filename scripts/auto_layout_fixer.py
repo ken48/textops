@@ -2,7 +2,14 @@
 
 import time
 
-from core.clipboard import read_clipboard, write_clipboard
+from core.clipboard import (
+    clipboard_change_count,
+    read_clipboard,
+    restore_clipboard,
+    snapshot_clipboard,
+    wait_for_clipboard_change,
+    write_clipboard,
+)
 from core.input_source import MacInputSourceManager
 from core.keyboard import FastKeyboard
 from transforms.layout_conversion import LayoutConversionDirection, replace_last_layout_mismatched_sequence
@@ -70,13 +77,13 @@ LAYOUT_A_TO_B = {
     '?': 'Э',
 }
 SELECT_LAST_LINE_DELAY = 0.05
-COPY_DELAY = 0.15
+COPY_TIMEOUT = 0.5
 PASTE_DELAY = 0.05
 TARGET_INPUT_SOURCE_ID_BY_MAPPING_DIRECTION = {
     LayoutConversionDirection.A: 'org.sil.ukelele.keyboardlayout.en-sym.en-sym',
     LayoutConversionDirection.B: 'org.sil.ukelele.keyboardlayout.ru-sym.ru-sym'
 }
-LAST_SEQUENCE_MAX_CHARS = 12
+LAST_SEQUENCE_MAX_CHARS = 24
 LAST_SEQUENCE_TEST_CHARS = 3
 
 
@@ -84,14 +91,16 @@ def main() -> None:
     start_ts = time.perf_counter()
     keyboard = FastKeyboard()
     input_manager = MacInputSourceManager()
-    original = read_clipboard()
+    original = snapshot_clipboard()
 
     try:
         keyboard.send_select_last_line()
         time.sleep(SELECT_LAST_LINE_DELAY)
 
+        change_count = clipboard_change_count()
         keyboard.send_copy()
-        time.sleep(COPY_DELAY)
+        if not wait_for_clipboard_change(change_count, COPY_TIMEOUT):
+            return
 
         text = read_clipboard()
         if not text.strip():
@@ -112,7 +121,7 @@ def main() -> None:
 
         time.sleep(PASTE_DELAY)
     finally:
-        write_clipboard(original)
+        restore_clipboard(original)
         print(f'duration: {time.perf_counter() - start_ts:.3f} sec.', flush=True)
 
 

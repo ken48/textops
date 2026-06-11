@@ -5,7 +5,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from transforms.cleanup_md import CleanupMarkdownOptions, cleanup_markdown
+from transforms.cleanup_md import (
+    CleanupMarkdownOptions,
+    _count_sentence_boundaries,
+    cleanup_markdown,
+)
 
 
 class CleanupMarkdownTests(unittest.TestCase):
@@ -358,6 +362,66 @@ class CleanupMarkdownTests(unittest.TestCase):
         )
 
         self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_version_like_digit_letter_dot_intact(self) -> None:
+        source = 'Python 3.x уже вышел. да.\n'
+        expected = 'Python 3.x уже вышел. Да.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_dotted_abbreviation_intact_and_lowercase_after_it(self) -> None:
+        source = 'это т.н. известный случай и т.д. без концовки\n'
+        expected = 'Это т.н. известный случай и т.д. без концовки'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_single_word_abbreviation_from_starting_new_sentence(self) -> None:
+        source = 'см. раздел про настройку. потом дальше.\n'
+        expected = 'См. раздел про настройку. Потом дальше.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_capitalizes_abbreviation_at_sentence_start(self) -> None:
+        source = 'т.е. мы должны успеть\n'
+        expected = 'Т.е. мы должны успеть'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_splits_glued_sentence_after_number(self) -> None:
+        source = 'их было 3.потом стало больше\n'
+        expected = 'Их было 3. Потом стало больше'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_splits_glued_single_letter_sentence_after_number(self) -> None:
+        source = 'нас было 3.я ушел\n'
+        expected = 'Нас было 3. Я ушел'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_name_prefix_abbreviations_lowercase_in_list(self) -> None:
+        source = '- офис на ул. Ленина\n- музей им. Пушкина\n'
+        expected = '- офис на ул. Ленина\n- музей им. Пушкина'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_counts_abbreviation_dot_as_boundary_before_capitalized_word(self) -> None:
+        self.assertEqual(
+            _count_sentence_boundaries('хлеб, молоко и т.д. Потом зайди в банк.'),
+            2,
+        )
+
+    def test_does_not_count_abbreviation_dot_before_lowercase_word(self) -> None:
+        self.assertEqual(
+            _count_sentence_boundaries('и т.д. и т.п. без конца'),
+            0,
+        )
+
+    def test_does_not_count_name_prefix_dot_before_proper_noun(self) -> None:
+        self.assertEqual(
+            _count_sentence_boundaries('офис на ул. Ленина'),
+            0,
+        )
 
     def test_allows_call_site_to_disable_sentence_capitalization(self) -> None:
         source = 'привет. "мир" - это тест\n'

@@ -65,6 +65,8 @@ class MacInputSourceManager:
         core_foundation.CFArrayGetCount.restype = c_long
         core_foundation.CFArrayGetValueAtIndex.argtypes = [self.CFArrayRef, c_long]
         core_foundation.CFArrayGetValueAtIndex.restype = c_void_p
+        core_foundation.CFBooleanGetValue.argtypes = [c_void_p]
+        core_foundation.CFBooleanGetValue.restype = c_bool
         core_foundation.CFRelease.argtypes = [c_void_p]
         core_foundation.CFRelease.restype = None
 
@@ -183,7 +185,11 @@ class MacInputSourceManager:
                         'name': self._cfstring_to_py(self.CFStringRef(name_ref)) if name_ref else '',
                         'type': human_type,
                         'lang': self._read_lang(source),
-                        'selected': '1' if selected_ref else '0',
+                        'selected': (
+                            '1'
+                            if selected_ref and self._CF.CFBooleanGetValue(selected_ref)
+                            else '0'
+                        ),
                     }
                 )
             return items

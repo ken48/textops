@@ -72,6 +72,7 @@ class SocketServer:
             print(f"warmpy start-attempt logging failed: reason={reason}", file=sys.stderr)
 
     def _cleanup(self) -> None:
+        self._stop.set()
         try:
             if self._sock is not None:
                 self._sock.close()
@@ -170,6 +171,10 @@ class SocketServer:
                 try:
                     conn, _ = s.accept()
                 except Exception:
+                    # Once cleanup closed the socket, accept fails forever; stop
+                    # instead of spinning on the error.
+                    if self._stop.is_set():
+                        break
                     continue
                 try:
                     self._handle_connection(conn)

@@ -37,7 +37,22 @@ SPACE_AFTER_PUNCT_RE = re.compile(r"(?<!\d)([,;:!?]+)(?=[0-9A-Za-zА-Яа-яЁё
 DASH_BETWEEN_WORDS_RE = re.compile(r"(?<=\S)\s+-\s+(?=\S)")
 NUM_COLON_RE = re.compile(r"(\d)[ \t]*:[ \t]*(\d)")
 MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
-SENTENCE_END_RE = re.compile(r'[.!?][]["»“”)]*$')
+# Dotted abbreviations of 1-2 letter groups: "т.н.", "т.е.", "и т.д.", "e.g.", "p.s."
+ABBREVIATION_RE = re.compile(r"(?<![\w.])(?:[^\W\d_]{1,2}\.){2,}(?!\w)")
+# Common single-word abbreviations whose trailing dot does not end a sentence.
+ABBREVIATION_WORD_RE = re.compile(
+    r"(?<![\w.])(?:"
+    r"см|ср|др|пр|стр|гл|рис|табл|прим|напр|тыс|млн|млрд|руб|англ|лат"
+    r"|etc|vs|fig|approx"
+    r")\.(?!\w)",
+    re.IGNORECASE,
+)
+# Abbreviations normally followed by a capitalized proper noun ("ул. Ленина",
+# "Mr. Brown"): a capital after them never signals a new sentence.
+NAME_PREFIX_ABBREVIATION_RE = re.compile(
+    r"(?<![\w.])(?:им|ул|ст|mr|mrs|ms|dr|st)\.(?!\w)",
+    re.IGNORECASE,
+)
 COORDINATED_ITEM_SEPARATOR_RE = re.compile(r"\s(?:->|→|=>|:)\s")
 TECHNICAL_TOKEN_RE = re.compile(
     r"(?<!\S)("
@@ -327,9 +342,42 @@ def _previous_sentence_char(text: str, start: int) -> str:
     return ""
 
 
-def _is_sentence_boundary(text: str, index: int) -> bool:
+def _starts_capitalized_word(text: str, start: int) -> bool:
+    _, next_char = _next_non_space(text, start)
+    return next_char.isalpha() and next_char.isupper()
+
+
+def _abbreviation_dot_indices(text: str) -> set[int]:
+    """Dots inside abbreviations that must not be treated as sentence boundaries.
+
+    The final dot of an abbreviation may still end the sentence: when the next
+    word is already capitalized, it is kept as a boundary. Name prefixes are the
+    exception — a capital after "ул."/"Mr." is a proper noun, not a new sentence.
+    """
+    indices: set[int] = set()
+
+    for match in NAME_PREFIX_ABBREVIATION_RE.finditer(text):
+        indices.add(match.end() - 1)
+
+    matches = list(ABBREVIATION_RE.finditer(text))
+    matches += ABBREVIATION_WORD_RE.finditer(text)
+    for match in matches:
+        for index in range(match.start(), match.end()):
+            if text[index] != ".":
+                continue
+            if index == match.end() - 1 and _starts_capitalized_word(text, index + 1):
+                continue
+            indices.add(index)
+
+    return indices
+
+
+def _is_sentence_boundary(text: str, index: int, abbreviation_dots: set[int]) -> bool:
     char = text[index]
     if char not in ".!?":
+        return False
+
+    if index in abbreviation_dots:
         return False
 
     prev_char = text[index - 1] if index > 0 else ""
@@ -366,17 +414,28 @@ def _restore_technical_tokens(text: str, replacements: list[str]) -> str:
 
 
 def _normalize_dot_spacing(text: str) -> str:
+    abbreviation_dots = _abbreviation_dot_indices(text)
     result: list[str] = []
 
     for index, char in enumerate(text):
         result.append(char)
-        if char != "." or index + 1 >= len(text):
+        if char != "." or index + 1 >= len(text) or index in abbreviation_dots:
             continue
 
         prev_char = text[index - 1] if index > 0 else ""
         next_char = text[index + 1]
 
         if next_char.isspace() or not _is_word_char(prev_char) or not next_char.isalpha():
+            continue
+
+        # "3.x"-style references: digit before the dot, single Latin letter after.
+        # A Cyrillic letter or a longer word after the dot ("было 3.я ушел",
+        # "было 3.потом") is a glued sentence start.
+        if (
+            prev_char.isdigit()
+            and next_char.isascii()
+            and (index + 2 >= len(text) or not text[index + 2].isalpha())
+        ):
             continue
 
         result.append(" ")
@@ -403,6 +462,7 @@ def _normalize_fragment_spacing(text: str, options: CleanupMarkdownOptions) -> s
 
 
 def _capitalize_sentences(text: str, sentence_start: bool) -> tuple[str, bool]:
+    abbreviation_dots = _abbreviation_dot_indices(text)
     result: list[str] = []
 
     for index, char in enumerate(text):
@@ -413,7 +473,7 @@ def _capitalize_sentences(text: str, sentence_start: bool) -> tuple[str, bool]:
 
         result.append(char)
 
-        if _is_sentence_boundary(text, index):
+        if _is_sentence_boundary(text, index, abbreviation_dots):
             sentence_start = True
         elif not char.isspace() and char not in "\"'()[]{}":
             sentence_start = False
@@ -425,14 +485,13 @@ def _format_prose_fragment(
     text: str,
     *,
     sentence_start: bool,
-    capitalize: bool,
     options: CleanupMarkdownOptions,
  ) -> tuple[str, bool]:
     replacements: list[str] = []
     if options.preserve_technical_tokens:
         text, replacements = _protect_technical_tokens(text)
     text = _normalize_fragment_spacing(text, options)
-    should_capitalize = capitalize and options.capitalize_sentences
+    should_capitalize = options.capitalize_sentences
     if should_capitalize and not sentence_start:
         text = re.sub(
             r'^([.!?]\s+)([A-Za-zА-Яа-яЁё])',
@@ -449,30 +508,17 @@ def _format_prose_fragment(
     return text, sentence_start
 
 
-def _looks_like_sentence(text: str) -> bool:
-    stripped = text.strip()
-    if not stripped:
-        return False
-
-    return bool(SENTENCE_END_RE.search(stripped))
-
-
 def _count_sentence_boundaries(text: str) -> int:
     stripped = text.strip()
     if not stripped:
         return 0
 
+    abbreviation_dots = _abbreviation_dot_indices(stripped)
     return sum(
-        1 for index in range(len(stripped)) if _is_sentence_boundary(stripped, index)
+        1
+        for index in range(len(stripped))
+        if _is_sentence_boundary(stripped, index, abbreviation_dots)
     )
-
-
-def _is_short_list_sentence(text: str) -> bool:
-    stripped = text.strip()
-    if not stripped:
-        return False
-
-    return len(stripped) <= SHORT_LIST_ITEM_MAX_CHARS
 
 
 def _restore_obsidian_wikilinks(text: str) -> str:
@@ -563,18 +609,9 @@ def _analyze_lists(tokens: Sequence[Any]) -> tuple[dict[int, bool], set[int]]:
 
             if token.type == "list_item_close":
                 collected_item = open_items.pop()
-                sentence_boundary_count = sum(
-                    _count_sentence_boundaries(text) for text in collected_item.texts
-                )
-                has_sentence_boundary = sentence_boundary_count > 0
-                ends_with_sentence = any(
-                    _looks_like_sentence(text) for text in collected_item.texts
-                )
-                short_sentence_item = (
-                    collected_item.paragraph_count == 1
-                    and sentence_boundary_count == 1
-                    and ends_with_sentence
-                    and all(_is_short_list_sentence(text) for text in collected_item.texts)
+                has_sentence_boundary = any(
+                    _count_sentence_boundaries(text) > 0
+                    for text in collected_item.texts
                 )
                 if not has_sentence_boundary:
                     skip_capitalization.update(collected_item.inline_indices)
@@ -648,7 +685,6 @@ class _InlineTextFormatter:
 
     def apply(self, inline_token: Any, token_index: int) -> None:
         self._sentence_start = token_index not in self._skip_capitalization
-        capitalize = True
 
         if not inline_token.children:
             return
@@ -674,7 +710,6 @@ class _InlineTextFormatter:
                 ) = _format_prose_fragment(
                     child.content,
                     sentence_start=self._sentence_start,
-                    capitalize=capitalize,
                     options=self._options,
                 )
                 continue

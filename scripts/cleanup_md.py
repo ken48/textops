@@ -3,12 +3,19 @@
 import time
 from sys import argv
 
-from core.clipboard import read_clipboard, write_clipboard
+from core.clipboard import (
+    clipboard_change_count,
+    read_clipboard,
+    restore_clipboard,
+    snapshot_clipboard,
+    wait_for_clipboard_change,
+    write_clipboard,
+)
 from core.keyboard import FastKeyboard
 from transforms.cleanup_md import CleanupMarkdownOptions, cleanup_markdown
 
 SELECT_ALL_DELAY = 0.05
-COPY_DELAY = 0.15
+COPY_TIMEOUT = 0.5
 PASTE_DELAY = 0.05
 
 MARKDOWN_CLEANUP_OPTIONS = CleanupMarkdownOptions(
@@ -30,15 +37,17 @@ MARKDOWN_CLEANUP_OPTIONS = CleanupMarkdownOptions(
 def normalize(select_all: bool = False) -> None:
     start_ts = time.perf_counter()
     keyboard = FastKeyboard()
-    original = read_clipboard()
+    original = snapshot_clipboard()
 
     try:
         if select_all:
             keyboard.send_select_all()
             time.sleep(SELECT_ALL_DELAY)
 
+        change_count = clipboard_change_count()
         keyboard.send_copy()
-        time.sleep(COPY_DELAY)
+        if not wait_for_clipboard_change(change_count, COPY_TIMEOUT):
+            return
 
         text = read_clipboard()
         if not text.strip():
@@ -49,7 +58,7 @@ def normalize(select_all: bool = False) -> None:
         keyboard.send_paste()
         time.sleep(PASTE_DELAY)
     finally:
-        write_clipboard(original)
+        restore_clipboard(original)
         print(f'duration: {time.perf_counter() - start_ts:.3f} sec.', flush=True)
 
 

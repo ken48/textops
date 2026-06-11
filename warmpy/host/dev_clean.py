@@ -32,12 +32,12 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
-def collect_modules_under(root_path: Union[str, Path]) -> list[str]:
+def collect_modules_under(root_path: str | Path) -> list[str]:
     root = _normalize_root(root_path)
     names: list[str] = []
 
     for name, module in list(sys.modules.items()):
-        if not module or name.startswith("host"):
+        if not module or name == "host" or name.startswith("host."):
             continue
 
         module_file = getattr(module, '__file__', None)
@@ -51,7 +51,7 @@ def collect_modules_under(root_path: Union[str, Path]) -> list[str]:
     return names
 
 
-def purge_modules_under(root_path: Union[str, Path]) -> list[str]:
+def purge_modules_under(root_path: str | Path) -> list[str]:
     root = _normalize_root(root_path)
     importlib.invalidate_caches()
 
