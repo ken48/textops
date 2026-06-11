@@ -18,6 +18,35 @@ There are two parts:
 
 Scripts are executed inside the already running app process, on the app main thread, one at a time. If a new request arrives while another script is still running, it is dropped.
 
+## Controller protocol
+
+`warmpyctl` resolves the script and optional clean root to absolute paths, then sends one UTF-8 JSON object over the Unix socket:
+
+```json
+{
+  "script": "/absolute/path/to/script.py",
+  "args": ["--select-all"],
+  "clean": false,
+  "clean_root": null
+}
+```
+
+The host validates the field types before dispatching the request. The controller closes the connection after sending the payload and does not wait for execution or return a script result.
+
+The host still accepts the older NUL-separated `script\0arg...` payload for compatibility, but `warmpyctl` uses JSON.
+
+## Clipboard synchronization
+
+The bundled text scripts use `NSPasteboard` directly:
+
+- snapshot every pasteboard item and all available representations before changing it
+- record `changeCount` immediately before sending `Cmd+C`
+- poll until `changeCount` changes, with a bounded timeout
+- abort on timeout instead of reading stale clipboard data
+- restore the complete original snapshot after the paste operation
+
+This makes the copy phase respond to the actual pasteboard update rather than a fixed delay, while preserving text, images, file references, and other pasteboard types.
+
 ## Script author contract
 
 A WarmPy script should assume:
@@ -76,6 +105,16 @@ Log markers:
 Failed extra app launches create audit files in `~/.warmpy/start-attempts/`.
 
 Note: opening the `.app` again through Finder may not create a second process at all. Launching the bundled executable directly from a terminal can create a second process, which then records an `already-running` attempt.
+
+## Menu bar lifecycle
+
+The menu bar item provides:
+
+- **Open Log** -- opens `~/.warmpy/warmpy.log`
+- **Restart** -- schedules a fresh bundled app launch after the current process exits
+- **Quit** -- terminates the current app process
+
+Restart is enabled only when WarmPy is running from a bundled `.app`.
 
 ## Notes
 

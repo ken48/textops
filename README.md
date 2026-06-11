@@ -33,9 +33,9 @@ A quick keyboard layout fixer. Typical flow:
 
 - select the last line in the active field
 - copy it
-- detect the last non-whitespace sequence
-- decide whether it was typed in Russian or English layout
-- convert it to the opposite layout
+- detect the last whitespace-delimited word (up to 24 characters)
+- infer its layout from the last three characters
+- convert the whole word to the opposite Russian/English layout
 - paste the corrected text back
 - switch the system input source to match the corrected language
 
@@ -101,7 +101,9 @@ The system consists of four parts:
 - **warmpyctl** -- a small CLI that sends run requests to WarmPy via Unix socket
 - **Karabiner-Elements** -- an optional hotkey trigger layer
 
-Scripts work through the system clipboard and keyboard event simulation: read text from the active field, transform it, paste the result back, and restore the original clipboard contents. They operate on the current macOS UI focus, not on stdin.
+Scripts work through the system pasteboard and keyboard event simulation. Before sending `Cmd+C`, they record the pasteboard `changeCount` and wait for an actual change instead of sleeping for a fixed copy delay. If copying times out, the run aborts rather than processing stale clipboard text.
+
+The scripts snapshot every available pasteboard item and representation, including non-text data such as images and file references. After pasting the transformed text, they restore that complete snapshot. They operate on the current macOS UI focus, not on stdin.
 
 ## Build config
 
@@ -132,6 +134,15 @@ The key rules:
 - Do not assume a clean process state between runs.
 - `warmpyctl` success means the request was sent, not that the script finished. Check `~/.warmpy/warmpy.log` for actual execution results.
 
+## Running tests
+
+The transformation and host regression tests run on Python 3.11 in CI:
+
+```bash
+python3.11 -m pip install -r requirements-dev.txt
+python3.11 -m unittest discover -s tests -v
+```
+
 ## Troubleshooting
 
 **WarmPy does not respond to hotkeys after first launch.**
@@ -142,6 +153,9 @@ macOS may reset Accessibility permissions after app updates or system upgrades. 
 
 **A second WarmPy instance does not start.**
 WarmPy enforces one instance per user. If you launch the bundled executable directly from a terminal, it will detect the running instance and exit (logged to `~/.warmpy/start-attempts/`).
+
+**WarmPy needs to reload after a rebuild or code change.**
+Use **Restart** from the menu bar item. The bundled app waits for the current process to exit and then launches a fresh instance.
 
 ## Project structure
 
