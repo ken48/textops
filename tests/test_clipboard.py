@@ -8,7 +8,15 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from core import clipboard
+try:
+    from core import clipboard
+except ModuleNotFoundError as exc:
+    if exc.name != "AppKit":
+        raise
+    clipboard = None
+    HAS_APPKIT = False
+else:
+    HAS_APPKIT = sys.platform == "darwin"
 
 
 class _FakePasteboard:
@@ -68,6 +76,7 @@ def _patched(pasteboard: _FakePasteboard, monotonic: _FakeMonotonic):
     )
 
 
+@unittest.skipUnless(HAS_APPKIT, "requires macOS AppKit")
 class WaitForClipboardChangeTests(unittest.TestCase):
     def test_text_immediately_present(self) -> None:
         pasteboard = _FakePasteboard(counts=[10, 11], values=["selected text"])
