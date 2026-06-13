@@ -4,7 +4,6 @@ import time
 
 from core.clipboard import (
     clipboard_change_count,
-    read_clipboard,
     restore_clipboard,
     snapshot_clipboard,
     wait_for_clipboard_change,
@@ -99,10 +98,10 @@ def main() -> None:
 
         change_count = clipboard_change_count()
         keyboard.send_copy()
-        if not wait_for_clipboard_change(change_count, COPY_TIMEOUT):
+        text = wait_for_clipboard_change(change_count, COPY_TIMEOUT)
+        if text is None:
             return
 
-        text = read_clipboard()
         if not text.strip():
             return
 

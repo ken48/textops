@@ -14,19 +14,38 @@ def clipboard_change_count() -> int:
     return NSPasteboard.generalPasteboard().changeCount()
 
 
-def wait_for_clipboard_change(previous_count: int, timeout: float = 0.5) -> bool:
-    """Wait until the pasteboard is rewritten (e.g. by a pending Cmd+C).
+def wait_for_clipboard_change(previous_count: int, timeout: float = 0.5) -> str | None:
+    """Wait for a new pasteboard write and return its string payload.
 
-    Returns False if nothing landed on the pasteboard within ``timeout`` —
-    the caller should abort instead of reading stale clipboard contents.
+    Phase 1: wait up to ``timeout`` for ``changeCount`` to advance past
+    ``previous_count`` (the copy may still be in flight).
+    Phase 2: once it advances, read the string payload. A pasteboard declares its
+    types atomically with the change, so we use the presence of a string type to
+    tell a non-text clipboard (an image — give up at once) from a text clipboard
+    whose value is still being materialized asynchronously (poll until ready).
+
+    Returns the copied string, or ``None`` if nothing was copied within ``timeout``
+    or the new clipboard contents are not text.
     """
     pasteboard = NSPasteboard.generalPasteboard()
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if pasteboard.changeCount() != previous_count:
-            return True
+            return _read_string_payload(pasteboard, deadline)
         time.sleep(0.01)
-    return False
+    return None
+
+
+def _read_string_payload(pasteboard: Any, deadline: float) -> str | None:
+    while True:
+        if pasteboard.availableTypeFromArray_([NSPasteboardTypeString]) is None:
+            return None
+        value = pasteboard.stringForType_(NSPasteboardTypeString)
+        if value is not None:
+            return str(value)
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.01)
 
 
 def read_clipboard() -> str:
