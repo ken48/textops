@@ -34,7 +34,9 @@ QUOTE_NORMALIZATION = str.maketrans(
 SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,;:!?])")
 SPACE_BEFORE_DOT_RE = re.compile(r"(?<!\d)\s+(\.)")
 SPACE_AFTER_PUNCT_RE = re.compile(r"(?<!\d)([,;:!?]+)(?=[0-9A-Za-zА-Яа-яЁё])")
-DASH_BETWEEN_WORDS_RE = re.compile(r"(?<=\S)\s+-\s+(?=\S)")
+DASH_SEPARATOR_RE = re.compile(
+    r"(?<=\S)(?:[ \t]*-(?!>)[ \t]+|[ \t]+-(?!>)[ \t]*|[ \t]*—[ \t]*)(?=\S)"
+)
 NUM_COLON_RE = re.compile(r"(\d)[ \t]*:[ \t]*(\d)")
 MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
 # Dotted abbreviations of 1-2 letter groups: "т.н.", "т.е.", "и т.д.", "e.g.", "p.s."
@@ -447,7 +449,7 @@ def _normalize_fragment_spacing(text: str, options: CleanupMarkdownOptions) -> s
     if options.normalize_quotes:
         text = text.translate(QUOTE_NORMALIZATION)
     if options.normalize_dashes:
-        text = DASH_BETWEEN_WORDS_RE.sub(" — ", text)
+        text = DASH_SEPARATOR_RE.sub(" — ", text)
     if options.normalize_time_ranges:
         text = NUM_COLON_RE.sub(r"\1:\2", text)
     if options.normalize_punctuation_spacing:

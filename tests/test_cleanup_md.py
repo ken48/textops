@@ -43,6 +43,30 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_normalizes_spacing_around_em_dash(self) -> None:
+        cases = (
+            ('слово— слово', 'Слово — слово'),
+            ('слово —слово', 'Слово — слово'),
+            ('слово—слово', 'Слово — слово'),
+            ('слово- продолжение', 'Слово — продолжение'),
+            ('слово -продолжение', 'Слово — продолжение'),
+            (
+                '"Диффузная идентичность"— классическое понятие.',
+                '"Диффузная идентичность" — классическое понятие.',
+            ),
+            (
+                '"Диффузная идентичность"- классическое понятие.',
+                '"Диффузная идентичность" — классическое понятие.',
+            ),
+        )
+
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_in_word_hyphen(self) -> None:
+        self.assertEqual(cleanup_markdown('это по-прежнему так'), 'Это по-прежнему так')
+
     def test_keeps_fragment_lists_tight_and_preserves_case(self) -> None:
         source = '- speed\n- simplicity\n- markdown support\n'
         expected = '- speed\n- simplicity\n- markdown support'
