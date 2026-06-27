@@ -275,6 +275,44 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
+    def test_keeps_lowercase_word_after_parenthesized_exclamation_inside_sentence(self) -> None:
+        source = 'Я пошел домой (а это неблизко!) пешком.'
+        expected = 'Я пошел домой (а это неблизко!) пешком.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_counts_quoted_exclamation_at_end_as_sentence_boundary(self) -> None:
+        self.assertEqual(_count_sentence_boundaries('Он сказал: "сделаю!"'), 1)
+
+    def test_keeps_lowercase_after_quoted_exclamation_inside_sentence(self) -> None:
+        source = 'Он сказал: "сделаю!" потом ушел.'
+        expected = 'Он сказал: "сделаю!" потом ушел.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_counts_quoted_exclamation_before_capitalized_word_as_sentence_boundary(self) -> None:
+        self.assertEqual(
+            _count_sentence_boundaries('Он сказал: "сделаю!" Потом ушел.'),
+            2,
+        )
+
+    def test_keeps_capitalized_word_after_parenthesized_exclamation(self) -> None:
+        source = 'Он был уверен (и это важно!) Потом ушел.'
+        expected = 'Он был уверен (и это важно!) Потом ушел.'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_counts_parenthesized_exclamation_before_capitalized_word_as_boundary(
+        self,
+    ) -> None:
+        self.assertEqual(
+            _count_sentence_boundaries('Он был уверен (и это важно!) Потом ушел.'),
+            2,
+        )
+
+    def test_counts_parenthesized_exclamation_at_end_as_sentence_boundary(self) -> None:
+        self.assertEqual(_count_sentence_boundaries('Он был уверен (и это важно!)'), 1)
+
     def test_capitalizes_after_period_following_closing_parenthesis(self) -> None:
         source = (
             'Статьи какие-то, курсы лекций (большие и маленькие). всего больше 1000 записей!!!'

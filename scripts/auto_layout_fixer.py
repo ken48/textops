@@ -11,7 +11,10 @@ from core.clipboard import (
 )
 from core.input_source import MacInputSourceManager
 from core.keyboard import FastKeyboard
-from transforms.layout_conversion import LayoutConversionDirection, replace_last_layout_mismatched_sequence
+from transforms.layout_conversion import (
+    LayoutConversionDirection,
+    replace_last_layout_mismatched_sequence,
+)
 
 LAYOUT_A_TO_B = {
     'q': 'й',
