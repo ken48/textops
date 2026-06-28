@@ -46,11 +46,6 @@ def normalize(select_all: bool = False) -> None:
         change_count = clipboard_change_count()
         keyboard.send_copy()
         text = wait_for_clipboard_change(change_count, COPY_TIMEOUT)
-        if text is None:
-            return
-
-        if not text.strip():
-            return
 
         transformed = cleanup_markdown(text, options=MARKDOWN_CLEANUP_OPTIONS)
         write_clipboard(transformed)

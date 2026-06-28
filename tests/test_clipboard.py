@@ -24,13 +24,14 @@ class _FakePasteboard:
         self,
         counts: list[int],
         values: list[str | None],
-        has_string_type: bool = True,
+        has_string_type: bool | list[bool] = True,
     ) -> None:
         self._counts = counts
         self._values = values
         self._has_string_type = has_string_type
         self._count_index = 0
         self._value_index = 0
+        self._type_index = 0
 
     def changeCount(self) -> int:
         index = min(self._count_index, len(self._counts) - 1)
@@ -39,12 +40,29 @@ class _FakePasteboard:
         return value
 
     def availableTypeFromArray_(self, _types: object) -> object | None:
-        return clipboard.NSPasteboardTypeString if self._has_string_type else None
+        has_string_type = self._next_has_string_type()
+        return clipboard.NSPasteboardTypeString if has_string_type else None
+
+    def types(self) -> list[str]:
+        has_string_type = (
+            self._has_string_type[-1]
+            if isinstance(self._has_string_type, list)
+            else self._has_string_type
+        )
+        return [str(clipboard.NSPasteboardTypeString)] if has_string_type else []
 
     def stringForType_(self, _type: object) -> str | None:
         index = min(self._value_index, len(self._values) - 1)
         value = self._values[index]
         self._value_index += 1
+        return value
+
+    def _next_has_string_type(self) -> bool:
+        if not isinstance(self._has_string_type, list):
+            return self._has_string_type
+        index = min(self._type_index, len(self._has_string_type) - 1)
+        value = self._has_string_type[index]
+        self._type_index += 1
         return value
 
 
@@ -107,31 +125,57 @@ class WaitForClipboardChangeTests(unittest.TestCase):
                 "slow text",
             )
 
-    def test_returns_none_immediately_for_non_text_clipboard(self) -> None:
-        # changeCount advanced but no string type is present (an image). We bail
-        # out at once — the huge timeout proves we never poll/wait for it.
+    def test_waits_for_late_string_type_after_clipboard_change(self) -> None:
+        pasteboard = _FakePasteboard(
+            counts=[11],
+            values=["late text"],
+            has_string_type=[False, False, True],
+        )
+        monotonic = _FakeMonotonic([0.0, 0.1, 0.2, 0.3])
+        p_pb, p_mono, p_sleep = _patched(pasteboard, monotonic)
+
+        with p_pb, p_mono, p_sleep:
+            self.assertEqual(
+                clipboard.wait_for_clipboard_change(previous_count=10, timeout=0.5),
+                "late text",
+            )
+
+    def test_raises_for_non_text_clipboard_after_deadline(self) -> None:
+        # changeCount advanced but no string type became available before the
+        # existing deadline.
         pasteboard = _FakePasteboard(
             counts=[11],
             values=[None],
             has_string_type=False,
         )
-        monotonic = _FakeMonotonic([0.0, 0.1])
+        monotonic = _FakeMonotonic([0.0, 0.1, 0.2, 0.6])
         p_pb, p_mono, p_sleep = _patched(pasteboard, monotonic)
 
         with p_pb, p_mono, p_sleep:
-            self.assertIsNone(
-                clipboard.wait_for_clipboard_change(previous_count=10, timeout=10.0),
-            )
+            with self.assertRaises(clipboard.ClipboardContentError):
+                clipboard.wait_for_clipboard_change(previous_count=10, timeout=0.5)
 
-    def test_returns_none_when_clipboard_never_changes(self) -> None:
+    def test_raises_timeout_when_clipboard_never_changes(self) -> None:
         pasteboard = _FakePasteboard(counts=[10, 10, 10], values=[None])
         monotonic = _FakeMonotonic([0.0, 0.1, 0.2, 0.6])
         p_pb, p_mono, p_sleep = _patched(pasteboard, monotonic)
 
         with p_pb, p_mono, p_sleep:
-            self.assertIsNone(
-                clipboard.wait_for_clipboard_change(previous_count=10, timeout=0.5),
-            )
+            with self.assertRaises(clipboard.ClipboardTimeoutError):
+                clipboard.wait_for_clipboard_change(previous_count=10, timeout=0.5)
+
+    def test_raises_timeout_when_text_payload_never_materializes(self) -> None:
+        pasteboard = _FakePasteboard(
+            counts=[11],
+            values=[None, None, None],
+            has_string_type=True,
+        )
+        monotonic = _FakeMonotonic([0.0, 0.1, 0.3, 0.6])
+        p_pb, p_mono, p_sleep = _patched(pasteboard, monotonic)
+
+        with p_pb, p_mono, p_sleep:
+            with self.assertRaises(clipboard.ClipboardTimeoutError):
+                clipboard.wait_for_clipboard_change(previous_count=10, timeout=0.5)
 
 
 if __name__ == "__main__":

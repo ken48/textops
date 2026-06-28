@@ -10,42 +10,72 @@ from AppKit import NSPasteboard, NSPasteboardItem, NSPasteboardTypeString
 ClipboardSnapshot = list[dict[str, Any]]
 
 
+class ClipboardError(RuntimeError):
+    """Base error for clipboard synchronization failures."""
+
+
+class ClipboardTimeoutError(ClipboardError):
+    pass
+
+
+class ClipboardContentError(ClipboardError):
+    pass
+
+
 def clipboard_change_count() -> int:
     return NSPasteboard.generalPasteboard().changeCount()
 
 
-def wait_for_clipboard_change(previous_count: int, timeout: float = 0.5) -> str | None:
+def wait_for_clipboard_change(previous_count: int, timeout: float = 0.5) -> str:
     """Wait for a new pasteboard write and return its string payload.
 
     Phase 1: wait up to ``timeout`` for ``changeCount`` to advance past
     ``previous_count`` (the copy may still be in flight).
-    Phase 2: once it advances, read the string payload. A pasteboard declares its
-    types atomically with the change, so we use the presence of a string type to
-    tell a non-text clipboard (an image — give up at once) from a text clipboard
-    whose value is still being materialized asynchronously (poll until ready).
+    Phase 2: once it advances, wait for the string payload to become available
+    before the same deadline.
 
-    Returns the copied string, or ``None`` if nothing was copied within ``timeout``
-    or the new clipboard contents are not text.
+    Raises ``ClipboardTimeoutError`` if nothing is copied within ``timeout`` or
+    if the string payload is not ready before the deadline. Raises
+    ``ClipboardContentError`` if the new clipboard contents are not text.
     """
     pasteboard = NSPasteboard.generalPasteboard()
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if pasteboard.changeCount() != previous_count:
-            return _read_string_payload(pasteboard, deadline)
+            return _read_string_payload(pasteboard, deadline, timeout)
         time.sleep(0.01)
-    return None
+    raise ClipboardTimeoutError(
+        f'clipboard did not change within {timeout:.3f} sec'
+    )
 
 
-def _read_string_payload(pasteboard: Any, deadline: float) -> str | None:
+def _read_string_payload(pasteboard: Any, deadline: float, timeout: float) -> str:
     while True:
-        if pasteboard.availableTypeFromArray_([NSPasteboardTypeString]) is None:
-            return None
-        value = pasteboard.stringForType_(NSPasteboardTypeString)
-        if value is not None:
-            return str(value)
+        has_string_type = (
+            pasteboard.availableTypeFromArray_([NSPasteboardTypeString]) is not None
+        )
+        if has_string_type:
+            value = pasteboard.stringForType_(NSPasteboardTypeString)
+            if value is not None:
+                return str(value)
         if time.monotonic() >= deadline:
-            return None
+            if not has_string_type:
+                raise ClipboardContentError(
+                    'clipboard changed but contains no text; '
+                    f'types={_pasteboard_type_names(pasteboard)}'
+                )
+            raise ClipboardTimeoutError(
+                f'clipboard text was not available within {timeout:.3f} sec'
+            )
         time.sleep(0.01)
+
+
+def _pasteboard_type_names(pasteboard: Any) -> str:
+    try:
+        types = pasteboard.types() or []
+    except Exception:
+        return 'unknown'
+    return ', '.join(str(item_type) for item_type in types) or 'none'
 
 
 def read_clipboard() -> str:
