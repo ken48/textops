@@ -48,8 +48,7 @@ class CleanupMarkdownTests(unittest.TestCase):
             ('слово— слово', 'Слово — слово'),
             ('слово —слово', 'Слово — слово'),
             ('слово—слово', 'Слово — слово'),
-            ('слово- продолжение', 'Слово — продолжение'),
-            ('слово -продолжение', 'Слово — продолжение'),
+            ('слово - продолжение', 'Слово — продолжение'),
             (
                 '"Диффузная идентичность"— классическое понятие.',
                 '"Диффузная идентичность" — классическое понятие.',
@@ -66,6 +65,22 @@ class CleanupMarkdownTests(unittest.TestCase):
 
     def test_keeps_in_word_hyphen(self) -> None:
         self.assertEqual(cleanup_markdown('это по-прежнему так'), 'Это по-прежнему так')
+
+    def test_normalizes_one_sided_space_hyphen(self) -> None:
+        cases = (
+            ('слово- продолжение', 'Слово- продолжение'),
+            ('слово -продолжение', 'Слово-продолжение'),
+        )
+
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_coordinated_suspended_hyphen(self) -> None:
+        self.assertEqual(
+            cleanup_markdown('субъект- и процесс-центрированным'),
+            'Субъект- и процесс-центрированным',
+        )
 
     def test_keeps_fragment_lists_tight_and_preserves_case(self) -> None:
         source = '- speed\n- simplicity\n- markdown support\n'
