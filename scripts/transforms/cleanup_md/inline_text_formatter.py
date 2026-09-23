@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from .cleanup_options import CleanupMarkdownOptions
+from .inline_dash_normalizer import normalize_inline_dashes
 from .prose_cleanup import _format_prose_fragment
 from .sentence_boundaries import _capitalize_sentences
 
@@ -17,6 +19,7 @@ class InlineTextFormatter:
         self._link_stack: list[str | None] = []
         self._skip_capitalization = skip_capitalization
         self._options = options
+        self._fragment_options = replace(options, normalize_dashes=False)
 
     def _update_state_from_literal(self, text: str) -> None:
         _, self._sentence_start = _capitalize_sentences(text, self._sentence_start)
@@ -51,7 +54,7 @@ class InlineTextFormatter:
                 ) = _format_prose_fragment(
                     child.content,
                     sentence_start=self._sentence_start,
-                    options=self._options,
+                    options=self._fragment_options,
                 )
                 continue
 
@@ -62,3 +65,8 @@ class InlineTextFormatter:
             literal = getattr(child, "content", "")
             if literal:
                 self._update_state_from_literal(literal)
+
+        if self._options.normalize_dashes:
+            inline_token.children = normalize_inline_dashes(
+                inline_token.children, self._options
+            )

@@ -92,7 +92,10 @@ def _normalize_dot_spacing(text: str) -> str:
     return "".join(result)
 
 
-def _normalize_fragment_spacing(text: str, options: CleanupMarkdownOptions) -> str:
+def _normalize_fragment_spacing(
+    text: str,
+    options: CleanupMarkdownOptions,
+) -> str:
     if options.normalize_quotes:
         text = text.translate(QUOTE_NORMALIZATION)
     if options.normalize_dashes:

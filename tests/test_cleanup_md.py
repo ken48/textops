@@ -2,6 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from markdown_it import MarkdownIt
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -57,6 +59,18 @@ class CleanupMarkdownTests(unittest.TestCase):
                 '"Диффузная идентичность"- классическое понятие.',
                 '"Диффузная идентичность" — классическое понятие.',
             ),
+            (
+                '**Качество человеческой среды** - насколько мне комфортно с этими людьми.',
+                '**Качество человеческой среды** — насколько мне комфортно с этими людьми.',
+            ),
+            (
+                'слово - **продолжение**',
+                'Слово — **продолжение**',
+            ),
+            (
+                'слово - `продолжение`',
+                'Слово — `продолжение`',
+            ),
         )
 
         for source, expected in cases:
@@ -65,6 +79,55 @@ class CleanupMarkdownTests(unittest.TestCase):
 
     def test_keeps_in_word_hyphen(self) -> None:
         self.assertEqual(cleanup_markdown('это по-прежнему так'), 'Это по-прежнему так')
+
+    def test_normalizes_dashes_across_formatting_boundaries(self) -> None:
+        cases = (
+            ('**слово** - **продолжение**', '**Слово** — **продолжение**'),
+            ('*слово* - продолжение', '*Слово* — продолжение'),
+            ('**слово —**`продолжение`', '**Слово —** `продолжение`'),
+            ('**слово—**`продолжение`', '**Слово —** `продолжение`'),
+            ('`слово`**—продолжение**', '`слово` **— продолжение**'),
+            ('**слово *—***`продолжение`', '**Слово *—*** `продолжение`'),
+            ('**слово** -**продолжение**', '**Слово**-**продолжение**'),
+            ('**слово** -\nпродолжение', '**Слово** -\nпродолжение'),
+        )
+
+        parser = MarkdownIt()
+        for source, expected in cases:
+            with self.subTest(source=source):
+                result = cleanup_markdown(source)
+                self.assertEqual(result, expected)
+                self.assertEqual(cleanup_markdown(result), result)
+                source_markup = [
+                    token.type
+                    for token in parser.parseInline(source)[0].children
+                    if token.nesting
+                ]
+                result_markup = [
+                    token.type
+                    for token in parser.parseInline(result)[0].children
+                    if token.nesting
+                ]
+                self.assertEqual(result_markup, source_markup)
+
+    def test_dash_normalization_preserves_protected_spans(self) -> None:
+        cases = (
+            ('`a - b` - **текст**', '`a - b` — **текст**'),
+            ('[a - b](https://x.com/a-b) - текст', '[a - b](https://x.com/a-b) — текст'),
+            ('**https://example.com/a—b** - текст', '**https://example.com/a—b** — текст'),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_can_disable_dash_normalization_across_formatting(self) -> None:
+        self.assertEqual(
+            cleanup_markdown(
+                '**слово** - **продолжение**',
+                CleanupMarkdownOptions(normalize_dashes=False),
+            ),
+            '**Слово** - **продолжение**',
+        )
 
     def test_normalizes_one_sided_space_hyphen(self) -> None:
         cases = (
