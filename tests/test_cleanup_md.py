@@ -80,6 +80,9 @@ class CleanupMarkdownTests(unittest.TestCase):
     def test_keeps_in_word_hyphen(self) -> None:
         self.assertEqual(cleanup_markdown('это по-прежнему так'), 'Это по-прежнему так')
 
+    def test_keeps_double_hyphen_task_marker(self) -> None:
+        self.assertEqual(cleanup_markdown('-- TODO'), '-- TODO')
+
     def test_normalizes_dashes_across_formatting_boundaries(self) -> None:
         cases = (
             ('**слово** - **продолжение**', '**Слово** — **продолжение**'),
