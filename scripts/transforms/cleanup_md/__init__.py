@@ -8,10 +8,7 @@ from markdown_it import MarkdownIt
 from .cleanup_options import CleanupMarkdownOptions
 from .inline_text_formatter import InlineTextFormatter
 from .list_analysis import analyze_lists, normalize_hardbreak_tokens
-from .markdown_postprocess import (
-    restore_obsidian_wikilinks,
-    strip_full_bold_heading_markup,
-)
+from .markdown_postprocess import strip_full_bold_heading_markup
 from .markdown_rendering import build_markdown_it
 from .sentence_boundaries import _count_sentence_boundaries
 
@@ -52,8 +49,6 @@ def cleanup_markdown(
 
     rendered = formatter.renderer.render(tokens, formatter.options, {})
     rendered = rendered.removesuffix("\n")
-    if resolved_options.restore_obsidian_wikilinks:
-        rendered = restore_obsidian_wikilinks(rendered)
     if resolved_options.normalize_bold_headings:
         rendered = strip_full_bold_heading_markup(rendered)
 

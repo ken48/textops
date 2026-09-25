@@ -5,6 +5,7 @@ from typing import Any
 
 from .cleanup_options import CleanupMarkdownOptions
 from .inline_dash_normalizer import normalize_inline_dashes
+from .obsidian_wikilinks import TOKEN_TYPE as OBSIDIAN_WIKILINK_TOKEN_TYPE
 from .prose_cleanup import _format_prose_fragment
 from .sentence_boundaries import _capitalize_sentences
 
@@ -34,6 +35,12 @@ class InlineTextFormatter:
             return
 
         for child in inline_token.children:
+            if (
+                child.type == OBSIDIAN_WIKILINK_TOKEN_TYPE
+                and not self._options.restore_obsidian_wikilinks
+            ):
+                child.type = "text"
+
             if child.type == "link_open":
                 self._link_stack.append((child.attrs or {}).get("href"))
                 continue

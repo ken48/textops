@@ -3,6 +3,7 @@ from __future__ import annotations
 from markdown_it.token import Token
 
 from .cleanup_options import CleanupMarkdownOptions
+from .obsidian_wikilinks import TOKEN_TYPE as OBSIDIAN_WIKILINK_TOKEN_TYPE
 from .prose_cleanup import (
     DASH_SEPARATOR_RE,
     LEFT_SPACED_HYPHEN_RE,
@@ -91,7 +92,7 @@ def normalize_inline_dashes(
             # Do not join prose across breaks or opaque HTML.
             chars.append("\n")
             positions.append(None)
-        elif token.type == "image":
+        elif token.type in {"image", OBSIDIAN_WIKILINK_TOKEN_TYPE}:
             chars.append("\ufffc")
             positions.append(None)
 

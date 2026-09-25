@@ -254,15 +254,27 @@ class CleanupMarkdownTests(unittest.TestCase):
 
         self.assertEqual(cleanup_markdown(source), expected)
 
-    def test_restores_obsidian_wikilink_brackets_after_render(self) -> None:
+    def test_preserves_obsidian_wikilink_as_opaque_syntax(self) -> None:
         source = '[[note]]\n'
-        expected = '[[Note]]'
+        expected = '[[note]]'
 
         self.assertEqual(cleanup_markdown(source), expected)
 
-    def test_restores_obsidian_wikilinks_inside_prose(self) -> None:
+    def test_preserves_obsidian_wikilinks_inside_prose(self) -> None:
         source = 'тест [[note]] текст\n'
         expected = 'Тест [[note]] текст'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_obsidian_embed_filename_intact(self) -> None:
+        source = 'вложение: ![[Screenshot.png]]\n'
+        expected = 'Вложение: ![[Screenshot.png]]'
+
+        self.assertEqual(cleanup_markdown(source), expected)
+
+    def test_keeps_obsidian_wikilink_alias_and_heading_intact(self) -> None:
+        source = 'ссылки [[note#some heading|label]] и ![[image.png|300]]\n'
+        expected = 'Ссылки [[note#some heading|label]] и ![[image.png|300]]'
 
         self.assertEqual(cleanup_markdown(source), expected)
 

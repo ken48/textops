@@ -9,6 +9,8 @@ from markdown_it import MarkdownIt
 from mdformat.renderer import DEFAULT_RENDERERS, MDRenderer, RenderContext, RenderTreeNode
 from mdformat.renderer._util import get_list_marker_type, is_tight_list, is_tight_list_item
 
+from .obsidian_wikilinks import ObsidianWikilinkPlugin
+
 WRAP_OPTIONS = {"wrap": "keep", "number": True}
 PARSER_EXTENSIONS = ("gfm",)
 THEMATIC_BREAK_MARKUP = "***"
@@ -217,6 +219,9 @@ def build_markdown_it() -> MarkdownIt:
 
         markdown_it.options["parser_extension"].append(plugin)
         plugin.update_mdit(markdown_it)
+
+    markdown_it.options["parser_extension"].append(ObsidianWikilinkPlugin)
+    ObsidianWikilinkPlugin.update_mdit(markdown_it)
 
     markdown_it.options["codeformatters"] = {}
     markdown_it.options["parser_extension"].append(_ThematicBreakRendererPlugin)
