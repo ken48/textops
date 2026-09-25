@@ -92,20 +92,37 @@ data = yaml.safe_load(deps_path.read_text(encoding="utf-8")) or {}
 
 pip_deps = data.get("pip") or []
 modules = data.get("modules") or []
+prewarm_modules = data.get("prewarm") or []
 
-for key, val in [("pip", pip_deps), ("modules", modules)]:
+for key, val in [
+    ("pip", pip_deps),
+    ("modules", modules),
+    ("prewarm", prewarm_modules),
+]:
     if not isinstance(val, list) or not all(isinstance(x, str) for x in val):
         raise SystemExit(f"ERROR: '{key}' must be a list of strings")
 
 pip_deps = [x.strip() for x in pip_deps if x.strip()]
 modules = [x.strip() for x in modules if x.strip()]
+prewarm_modules = [x.strip() for x in prewarm_modules if x.strip()]
 
 dedup_modules = list(dict.fromkeys(modules))
+dedup_prewarm_modules = list(dict.fromkeys(prewarm_modules))
 
 build_dir.mkdir(parents=True, exist_ok=True)
 pip_out.write_text("\n".join(pip_deps) + ("\n" if pip_deps else ""), encoding="utf-8")
 inc_out.write_text(json.dumps(dedup_modules, indent=2), encoding="utf-8")
-warmup_out.write_text(json.dumps({"modules": dedup_modules}, indent=2), encoding="utf-8")
+warmup_out.write_text(
+    json.dumps(
+        {
+            "modules": dedup_modules,
+            "prewarm_modules": dedup_prewarm_modules,
+            "prewarm_paths": [str(deps_path.parent.resolve())],
+        },
+        indent=2,
+    ),
+    encoding="utf-8",
+)
 PY
 
 if [[ -s "$PIP_DEPS_TXT" ]]; then

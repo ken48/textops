@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch, sentinel
 
 from markdown_it import MarkdownIt
 
@@ -9,12 +10,28 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from transforms.cleanup_md import (
     CleanupMarkdownOptions,
+    _build_markdown_formatter,
     _count_sentence_boundaries,
     cleanup_markdown,
+    prewarm,
 )
 
 
 class CleanupMarkdownTests(unittest.TestCase):
+    def test_prewarm_builds_and_caches_formatter(self) -> None:
+        _build_markdown_formatter.cache_clear()
+        self.addCleanup(_build_markdown_formatter.cache_clear)
+
+        with patch(
+            "transforms.cleanup_md.build_markdown_it",
+            return_value=sentinel.formatter,
+        ) as build:
+            prewarm()
+            prewarm()
+
+        build.assert_called_once_with()
+        self.assertIs(_build_markdown_formatter(), sentinel.formatter)
+
     def test_formats_markdown_prose_without_breaking_structure(self) -> None:
         source = '# heading\n\n- first item\n  - nested item\n\n> "quote" - here\n'
         expected = '# Heading\n\n- first item\n\n  - nested item\n\n> "Quote" — here'

@@ -18,6 +18,11 @@ def _build_markdown_formatter() -> MarkdownIt:
     return build_markdown_it()
 
 
+def prewarm() -> None:
+    """Build and cache the formatter before the first interactive run."""
+    _build_markdown_formatter()
+
+
 def cleanup_markdown(
     text: str,
     options: CleanupMarkdownOptions | None = None,

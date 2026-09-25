@@ -26,3 +26,8 @@ modules:
   - mdit_py_plugins
   - mdurl
   - linkify_it
+
+prewarm:
+  - core.clipboard
+  - core.keyboard
+  - transforms.cleanup_md

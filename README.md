@@ -119,10 +119,15 @@ pip:
 modules:
   - Cocoa
   - Quartz
+
+prewarm:
+  - my_package.expensive_feature
 ```
 
 - `pip` -- packages to install into the build environment
 - `modules` -- modules to bundle and preload at startup
+- `prewarm` -- project modules, resolved relative to the config directory, whose
+  parameterless `prewarm()` hook WarmPy calls at startup
 
 ## Writing your own script
 

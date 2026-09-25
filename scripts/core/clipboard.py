@@ -22,6 +22,11 @@ class ClipboardContentError(ClipboardError):
     pass
 
 
+def prewarm() -> None:
+    """Establish the process's connection to the general pasteboard."""
+    NSPasteboard.generalPasteboard().changeCount()
+
+
 def clipboard_change_count() -> int:
     return NSPasteboard.generalPasteboard().changeCount()
 

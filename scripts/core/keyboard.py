@@ -8,6 +8,13 @@ from Quartz import (
 )
 
 
+def prewarm() -> None:
+    """Initialize Quartz keyboard-event creation without posting an event."""
+    event = CGEventCreateKeyboardEvent(None, 0, True)
+    if event is None:
+        raise RuntimeError('failed to create a keyboard event during prewarm')
+
+
 class FastKeyboard:
     def __init__(self) -> None:
         self.key_codes: dict[str, int] = {

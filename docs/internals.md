@@ -16,6 +16,12 @@ There are two parts:
 - `host.app` keeps a Python runtime alive, owns a local Unix socket, optionally preloads selected modules, and executes accepted scripts
 - `ctl` sends a single request to the socket and exits immediately
 
+At startup, WarmPy first imports the dependency modules listed under `modules`
+in `warmpy.yaml`. It then imports every project module listed under `prewarm`
+and calls that module's parameterless `prewarm()` hook. Prewarm modules are
+resolved relative to the directory containing `warmpy.yaml`; failures are
+logged independently and do not prevent the remaining hooks from running.
+
 Scripts are executed inside the already running app process, on the app main thread, one at a time. If a new request arrives while another script is still running, it is dropped.
 
 ## Controller protocol
